@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="ru">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <meta name="description" content="G-code Generator для CNC 3018 — с учётом диаметра фрезы и режимом сверления для окон.">
+    <meta name="description"
+        content="G-code Generator для CNC 3018 — с учётом диаметра фрезы и режимом сверления для окон.">
     <meta name="author" content="Pavel Volkov / volkovhl.github.io">
-    <title>G-code Generator CNC 3018 + сверление + лазер</title>
+    <title>G-code Generator CNC 3018 + спираль / концентрические контуры</title>
     <style>
         * {
             margin: 0;
@@ -13,6 +15,7 @@
             box-sizing: border-box;
             user-select: none;
         }
+
         body {
             background: #2b2418 url('data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI0MCIgaGVpZ2h0PSI0MCIgdmlld0JveD0iMCAwIDQwIDQwIj48cGF0aCBmaWxsPSIjM2QyYzFhIiBmaWxsLW9wYWNpdHk9IjAuMTUiIGQ9Ik0wIDBoNDB2NDBIMHoiLz48cGF0aCBkPSJNMjAgMjBhMTAgMTAgMCAwIDEgMjAgMCAxMCAxMCAwIDAgMS0yMCAweiIgZmlsbD0iIzU0M2IyNCIgZmlsbC1vcGFjaXR5PSIwLjA4Ii8+PC9zdmc+');
             font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
@@ -24,6 +27,7 @@
             padding: 24px;
             position: relative;
         }
+
         body::before {
             content: "";
             position: fixed;
@@ -32,20 +36,22 @@
             width: 100%;
             height: 100%;
             pointer-events: none;
-            background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(30,20,10,0.3) 100%);
+            background: radial-gradient(circle at 50% 50%, transparent 60%, rgba(30, 20, 10, 0.3) 100%);
             z-index: 0;
         }
+
         .container {
             max-width: 1480px;
             width: 100%;
             background: #fef5e7;
             background-image: linear-gradient(to bottom, #fff2e0, #faeac9);
             border-radius: 64px 48px 64px 48px;
-            box-shadow: 20px 25px 40px rgba(0,0,0,0.4), inset 0 1px 4px rgba(255,245,215,0.8);
+            box-shadow: 20px 25px 40px rgba(0, 0, 0, 0.4), inset 0 1px 4px rgba(255, 245, 215, 0.8);
             padding: 28px 30px;
             border: 1px solid #dac292;
             position: relative;
         }
+
         .container::after {
             content: "✧  ✧  ✧";
             position: absolute;
@@ -56,6 +62,7 @@
             letter-spacing: 4px;
             opacity: 0.5;
         }
+
         .container::before {
             content: "⚜";
             position: absolute;
@@ -66,6 +73,7 @@
             opacity: 0.35;
             transform: rotate(-15deg);
         }
+
         .header {
             display: flex;
             align-items: center;
@@ -75,6 +83,7 @@
             padding-bottom: 12px;
             margin-bottom: 20px;
         }
+
         .header h1 {
             font-size: 1.7rem;
             font-weight: 600;
@@ -85,6 +94,7 @@
             gap: 10px;
             flex-wrap: wrap;
         }
+
         .header h1 small {
             font-size: 0.7rem;
             font-weight: normal;
@@ -93,15 +103,17 @@
             padding: 4px 12px;
             border-radius: 40px;
         }
+
         .header .sub {
             margin-left: auto;
             font-size: 0.8rem;
             color: #7a5a3a;
-            background: rgba(200,170,120,0.25);
+            background: rgba(200, 170, 120, 0.25);
             padding: 4px 18px;
             border-radius: 40px;
             font-weight: 500;
         }
+
         .params-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -109,18 +121,21 @@
             background: #fcf3e3;
             border-radius: 48px 28px 48px 28px;
             padding: 20px 24px 24px;
-            box-shadow: 8px 8px 16px rgba(60,40,20,0.2), inset 0 1px 1px rgba(255,250,210,0.8);
+            box-shadow: 8px 8px 16px rgba(60, 40, 20, 0.2), inset 0 1px 1px rgba(255, 250, 210, 0.8);
             border: 1px solid #e8d2af;
             margin-bottom: 20px;
         }
+
         .param-group {
             display: flex;
             flex-direction: column;
             gap: 3px;
         }
+
         .param-group.full {
             grid-column: 1 / -1;
         }
+
         .param-label {
             font-size: 0.82rem;
             font-weight: 600;
@@ -131,6 +146,7 @@
             flex-wrap: wrap;
             gap: 4px;
         }
+
         .param-label .value {
             font-weight: 700;
             color: #3e2a1f;
@@ -141,11 +157,13 @@
             min-width: 40px;
             text-align: center;
         }
+
         .param-label .unit {
             font-weight: 400;
             color: #886e48;
             font-size: 0.7rem;
         }
+
         .param-label .radius-badge {
             font-size: 0.6rem;
             background: #dac294;
@@ -154,6 +172,7 @@
             color: #4b351e;
             font-weight: 500;
         }
+
         .hint {
             font-size: 0.65rem;
             color: #886e48;
@@ -161,12 +180,14 @@
             font-style: italic;
             margin-top: 1px;
         }
+
         .input-with-slider {
             display: flex;
             align-items: center;
             gap: 8px;
             margin-top: 2px;
         }
+
         .input-with-slider input[type="range"] {
             flex: 1;
             height: 6px;
@@ -177,6 +198,7 @@
             outline: none;
             transition: background 0.2s;
         }
+
         .input-with-slider input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none;
             appearance: none;
@@ -186,12 +208,14 @@
             border-radius: 50%;
             cursor: pointer;
             border: 2px solid #fef3e2;
-            box-shadow: 0 2px 8px rgba(60,40,20,0.3);
+            box-shadow: 0 2px 8px rgba(60, 40, 20, 0.3);
             transition: transform 0.15s;
         }
+
         .input-with-slider input[type="range"]::-webkit-slider-thumb:hover {
             transform: scale(1.1);
         }
+
         .input-with-slider input[type="range"]::-moz-range-thumb {
             width: 18px;
             height: 18px;
@@ -199,8 +223,9 @@
             border-radius: 50%;
             cursor: pointer;
             border: 2px solid #fef3e2;
-            box-shadow: 0 2px 8px rgba(60,40,20,0.3);
+            box-shadow: 0 2px 8px rgba(60, 40, 20, 0.3);
         }
+
         .input-with-slider .num-input {
             width: 60px;
             padding: 4px 6px;
@@ -216,24 +241,31 @@
             transition: border-color 0.2s;
             flex-shrink: 0;
         }
+
         .input-with-slider .num-input:focus {
             border-color: #8b6946;
             background: #fff8ee;
         }
+
         .input-with-slider .num-input::-webkit-outer-spin-button,
         .input-with-slider .num-input::-webkit-inner-spin-button {
             -webkit-appearance: none;
             margin: 0;
         }
+
         .input-with-slider .num-input[type="number"] {
             -moz-appearance: textfield;
         }
-        .shape-selector, .mode-selector {
+
+        .shape-selector,
+        .mode-selector {
             display: flex;
             gap: 8px;
             flex-wrap: wrap;
         }
-        .shape-btn, .mode-btn {
+
+        .shape-btn,
+        .mode-btn {
             padding: 6px 18px;
             border: 2px solid #dac294;
             background: #fef5e7;
@@ -247,40 +279,88 @@
             align-items: center;
             gap: 6px;
         }
-        .shape-btn:hover, .mode-btn:hover {
+
+        .shape-btn:hover,
+        .mode-btn:hover {
             border-color: #b5823a;
             background: #fff2e0;
         }
+
         .shape-btn.active {
             border-color: #8b6946;
             background: #8b6946;
             color: #fef3e2;
-            box-shadow: 0 4px 14px rgba(139,105,70,0.35);
+            box-shadow: 0 4px 14px rgba(139, 105, 70, 0.35);
         }
+
         .mode-btn.active {
             border-color: #2d7a5a;
             background: #2d7a5a;
             color: #fef3e2;
-            box-shadow: 0 4px 14px rgba(45,122,90,0.35);
+            box-shadow: 0 4px 14px rgba(45, 122, 90, 0.35);
         }
-        .mode-btn.laser-active {
+
+        .mode-btn.laser-active.active {
             border-color: #b3472a;
             background: #b3472a;
             color: #fef3e2;
-            box-shadow: 0 4px 14px rgba(179,71,42,0.35);
+            box-shadow: 0 4px 14px rgba(179, 71, 42, 0.35);
         }
+
+        .mode-btn.laser-active:not(.active) {
+            border-color: #dac294;
+            background: #fef5e7;
+            color: #5a3e28;
+        }
+
+        .mode-btn.pocket-mode.active {
+            border-color: #8e44ad;
+            background: #8e44ad;
+            color: #fef3e2;
+            box-shadow: 0 4px 14px rgba(142, 68, 173, 0.35);
+        }
+
+        .side-btn {
+            padding: 6px 18px;
+            border: 2px solid #dac294;
+            background: #fef5e7;
+            border-radius: 40px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #5a3e28;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .side-btn:hover {
+            border-color: #b5823a;
+            background: #fff2e0;
+        }
+
+        .side-btn.active {
+            border-color: #3d6b9a;
+            background: #3d6b9a;
+            color: #fef3e2;
+            box-shadow: 0 4px 14px rgba(61, 107, 154, 0.35);
+        }
+
         .radius-split {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 10px 20px;
             padding: 8px 12px;
-            background: rgba(200,170,120,0.12);
+            background: rgba(200, 170, 120, 0.12);
             border-radius: 28px;
             border-left: 3px solid #b47c48;
         }
+
         .radius-split .param-group {
             margin-bottom: 0;
         }
+
         .checkbox-group {
             display: flex;
             align-items: center;
@@ -288,12 +368,14 @@
             padding: 6px 0;
             flex-wrap: wrap;
         }
+
         .checkbox-group input[type="checkbox"] {
             width: 20px;
             height: 20px;
             accent-color: #8b6946;
             cursor: pointer;
         }
+
         .checkbox-group label {
             font-size: 0.85rem;
             font-weight: 600;
@@ -303,12 +385,14 @@
             align-items: center;
             gap: 6px;
         }
+
         .checkbox-group .hint-inline {
             font-size: 0.7rem;
             color: #886e48;
             font-weight: normal;
             font-style: italic;
         }
+
         .checkbox-group .laser-badge {
             background: #b3472a;
             color: #fef0da;
@@ -317,12 +401,14 @@
             font-size: 0.7rem;
             font-weight: 700;
         }
+
         .actions {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
             margin-top: 4px;
         }
+
         .btn {
             padding: 10px 24px;
             border: none;
@@ -335,52 +421,110 @@
             align-items: center;
             gap: 8px;
         }
-        .btn-primary {
-            background: #8b6946;
-            color: #fef3e2;
-            box-shadow: 0 4px 14px rgba(139,105,70,0.35);
-            border-bottom: 2px solid #4d351c;
+
+        .btn-generate {
+            background: #c0392b;
+            color: #fff;
+            box-shadow: 0 4px 20px rgba(192, 57, 43, 0.5);
+            border-bottom: 3px solid #922b21;
+            font-size: 1.1rem;
+            padding: 14px 36px;
+            letter-spacing: 0.5px;
+            flex: 1;
+            justify-content: center;
+            min-width: 200px;
         }
-        .btn-primary:hover { background: #7a5a3a; transform: translateY(-2px); }
-        .btn-primary:active { transform: scale(0.97); }
+
+        .btn-generate:hover {
+            background: #e74c3c;
+            transform: translateY(-2px) scale(1.02);
+            box-shadow: 0 6px 30px rgba(192, 57, 43, 0.6);
+        }
+
+        .btn-generate:active {
+            transform: scale(0.96);
+        }
+
+        .btn-generate:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: 0 2px 10px rgba(192, 57, 43, 0.3);
+        }
+
+        .btn-generate .spinner {
+            display: inline-block;
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top-color: #fff;
+            animation: spin 0.7s linear infinite;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
         .btn-secondary {
             background: #e8d2af;
             color: #4b351e;
         }
-        .btn-secondary:hover { background: #dac294; }
+
+        .btn-secondary:hover {
+            background: #dac294;
+        }
+
         .btn-download {
             background: #b47c48;
             color: #fef3e2;
-            box-shadow: 0 4px 14px rgba(180,124,72,0.35);
+            box-shadow: 0 4px 14px rgba(180, 124, 72, 0.35);
             border-bottom: 2px solid #7a5a2a;
         }
-        .btn-download:hover { background: #9f6a3a; transform: translateY(-2px); }
-        .btn-download:active { transform: scale(0.97); }
+
+        .btn-download:hover {
+            background: #9f6a3a;
+            transform: translateY(-2px);
+        }
+
+        .btn-download:active {
+            transform: scale(0.97);
+        }
+
         .btn-cutviewer {
             background: #2d7a5a;
             color: #fef3e2;
             border-bottom: 2px solid #1a4a3a;
         }
+
         .btn-cutviewer:hover {
             background: #1f5a44;
             transform: translateY(-2px);
         }
-        .btn-cutviewer:active { transform: scale(0.97); }
+
+        .btn-cutviewer:active {
+            transform: scale(0.97);
+        }
+
         .output-section {
             display: grid;
             grid-template-columns: 1fr 1fr;
             gap: 22px;
             margin-top: 6px;
         }
+
         .output-card {
             background: #fcf3e3;
             border-radius: 48px 28px 48px 28px;
             overflow: hidden;
             display: flex;
             flex-direction: column;
-            box-shadow: 8px 8px 16px rgba(60,40,20,0.15);
+            box-shadow: 8px 8px 16px rgba(60, 40, 20, 0.15);
             border: 1px solid #e2cca8;
         }
+
         .output-card .card-header {
             padding: 10px 18px;
             background: #f0e4d0;
@@ -393,6 +537,7 @@
             border-bottom: 1px solid #dac294;
             flex-shrink: 0;
         }
+
         .output-card .card-header .badge {
             font-weight: 400;
             font-size: 0.7rem;
@@ -401,6 +546,7 @@
             padding: 2px 14px;
             border-radius: 20px;
         }
+
         .gcode-textarea {
             flex: 1;
             padding: 14px 18px;
@@ -418,23 +564,29 @@
             white-space: pre;
             overflow: auto;
         }
+
         .gcode-textarea::selection {
             background: #8b694655;
         }
+
         .gcode-textarea::-webkit-scrollbar {
             width: 8px;
             height: 8px;
         }
+
         .gcode-textarea::-webkit-scrollbar-track {
             background: #2b2418;
         }
+
         .gcode-textarea::-webkit-scrollbar-thumb {
             background: #8b6946;
             border-radius: 10px;
         }
+
         .gcode-textarea::-webkit-scrollbar-thumb:hover {
             background: #7a5a3a;
         }
+
         .preview-canvas-wrap {
             flex: 1;
             background: #2b2418;
@@ -445,6 +597,7 @@
             min-height: 380px;
             position: relative;
         }
+
         .preview-canvas-wrap canvas {
             width: 100%;
             height: 100%;
@@ -453,13 +606,14 @@
             background: #1f1a14;
             display: block;
         }
+
         .preview-info {
             position: absolute;
             bottom: 14px;
             right: 20px;
             font-size: 11px;
             color: #b48c5c;
-            background: rgba(30,20,10,0.8);
+            background: rgba(30, 20, 10, 0.8);
             padding: 4px 16px;
             border-radius: 20px;
             backdrop-filter: blur(4px);
@@ -467,6 +621,7 @@
             pointer-events: none;
             border: 1px solid #5a3e28;
         }
+
         .toast {
             position: fixed;
             bottom: 30px;
@@ -478,28 +633,35 @@
             border-radius: 40px;
             font-weight: 500;
             font-size: 0.95rem;
-            box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
             opacity: 0;
             transition: all 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
             pointer-events: none;
             z-index: 999;
             border: 1px solid #b48c5c;
         }
+
         .toast.show {
             opacity: 1;
             transform: translateX(-50%) translateY(0);
         }
-        .hidden { display: none !important; }
+
+        .hidden {
+            display: none !important;
+        }
+
         .download-group {
             display: flex;
             gap: 10px;
             flex-wrap: wrap;
         }
+
         .download-group .btn {
             flex: 1;
             min-width: 160px;
             justify-content: center;
         }
+
         .footer-links {
             margin-top: 20px;
             text-align: center;
@@ -507,20 +669,24 @@
             border-top: 1px dashed #dabb84;
             padding-top: 16px;
         }
+
         .footer-links a {
             color: #7a5a3a;
             text-decoration: none;
             transition: color 0.2s;
             font-weight: 500;
         }
+
         .footer-links a:hover {
             color: #4d351c;
             text-decoration: underline;
         }
+
         .footer-links .sep {
             color: #b48c5c;
             margin: 0 8px;
         }
+
         .compat-hint {
             font-size: 0.6rem;
             color: #886e48;
@@ -528,13 +694,14 @@
             margin-top: 4px;
             font-style: italic;
         }
+
         .legend {
             display: flex;
             gap: 16px;
             font-size: 0.7rem;
             color: #b48c5c;
             padding: 4px 8px;
-            background: rgba(30,20,10,0.6);
+            background: rgba(30, 20, 10, 0.6);
             border-radius: 20px;
             backdrop-filter: blur(4px);
             position: absolute;
@@ -545,1398 +712,2159 @@
             font-family: monospace;
             flex-wrap: wrap;
         }
+
         .legend .item {
             display: flex;
             align-items: center;
             gap: 6px;
         }
+
         .legend .color-dot {
             width: 14px;
             height: 4px;
             border-radius: 4px;
             display: inline-block;
         }
-        .color-dot.green { background: #6ac96a; }
-        .color-dot.red { background: #e87474; }
-        .color-dot.yellow { background: #e8c84a; }
-        .color-dot.laser { background: #ff4444; }
-        @media (max-width: 820px) {
-            .container { padding: 16px 14px 24px; }
-            .params-grid { grid-template-columns: 1fr; gap: 12px; padding: 16px; }
-            .output-section { grid-template-columns: 1fr; gap: 16px; }
-            .header .sub { margin-left: 0; width: 100%; text-align: left; }
-            .shape-btn, .mode-btn { padding: 5px 12px; font-size: 0.8rem; }
-            .radius-split { grid-template-columns: 1fr; gap: 6px; }
-            .gcode-textarea { min-height: 220px; max-height: 300px; }
-            .preview-canvas-wrap { min-height: 220px; }
-            .btn { padding: 8px 16px; font-size: 0.8rem; }
-            .header h1 { font-size: 1.3rem; }
-            .download-group .btn { min-width: 120px; font-size: 0.75rem; padding: 8px 12px; }
-            .input-with-slider .num-input { width: 50px; font-size: 0.75rem; }
-            .legend { font-size: 0.6rem; gap: 10px; top: 10px; left: 12px; }
+
+        .color-dot.green {
+            background: #6ac96a;
         }
+
+        .color-dot.red {
+            background: #e87474;
+        }
+
+        .color-dot.yellow {
+            background: #e8c84a;
+        }
+
+        .color-dot.laser {
+            background: #ff4444;
+        }
+
+        .color-dot.spiral {
+            background: #66ccff;
+        }
+
+        .color-dot.pocket {
+            background: #9b59b6;
+        }
+
+        .color-dot.disabled {
+            background: #555;
+        }
+
+        /* --- Новый стиль для чекбокса отключения визуализации --- */
+        .render-toggle-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 4px 0;
+        }
+
+        .render-toggle-group input[type="checkbox"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #8b6946;
+            cursor: pointer;
+        }
+
+        .render-toggle-group label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #4b351e;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .render-toggle-group .hint-inline {
+            font-size: 0.7rem;
+            color: #886e48;
+            font-weight: normal;
+            font-style: italic;
+        }
+
+        .render-off .preview-canvas-wrap canvas {
+            opacity: 0.3;
+            filter: grayscale(0.5);
+        }
+
+        .render-off .legend {
+            opacity: 0.3;
+        }
+
+        .render-off .preview-info {
+            opacity: 0.3;
+        }
+
+        .render-off .preview-canvas-wrap {
+            background: #1a1510;
+        }
+
+        .render-off .preview-canvas-wrap::after {
+            content: "⚡ Визуализация отключена";
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #b48c5c;
+            font-size: 18px;
+            font-weight: 600;
+            letter-spacing: 2px;
+            background: rgba(30, 20, 10, 0.85);
+            padding: 12px 28px;
+            border-radius: 40px;
+            border: 1px solid #5a3e28;
+            pointer-events: none;
+            font-family: 'Segoe UI', sans-serif;
+        }
+
+        @media (max-width: 820px) {
+            .container {
+                padding: 16px 14px 24px;
+            }
+
+            .params-grid {
+                grid-template-columns: 1fr;
+                gap: 12px;
+                padding: 16px;
+            }
+
+            .output-section {
+                grid-template-columns: 1fr;
+                gap: 16px;
+            }
+
+            .header .sub {
+                margin-left: 0;
+                width: 100%;
+                text-align: left;
+            }
+
+            .shape-btn,
+            .mode-btn {
+                padding: 5px 12px;
+                font-size: 0.8rem;
+            }
+
+            .radius-split {
+                grid-template-columns: 1fr;
+                gap: 6px;
+            }
+
+            .gcode-textarea {
+                min-height: 220px;
+                max-height: 300px;
+            }
+
+            .preview-canvas-wrap {
+                min-height: 220px;
+            }
+
+            .btn {
+                padding: 8px 16px;
+                font-size: 0.8rem;
+            }
+
+            .btn-generate {
+                font-size: 1rem;
+                padding: 12px 24px;
+                min-width: 160px;
+            }
+
+            .header h1 {
+                font-size: 1.3rem;
+            }
+
+            .download-group .btn {
+                min-width: 120px;
+                font-size: 0.75rem;
+                padding: 8px 12px;
+            }
+
+            .input-with-slider .num-input {
+                width: 50px;
+                font-size: 0.75rem;
+            }
+
+            .legend {
+                font-size: 0.6rem;
+                gap: 10px;
+                top: 10px;
+                left: 12px;
+            }
+
+            .render-off .preview-canvas-wrap::after {
+                font-size: 14px;
+                padding: 8px 18px;
+            }
+        }
+
         @media (max-width: 480px) {
-            .container { padding: 10px 8px 16px; border-radius: 32px 24px 32px 24px; }
-            .params-grid { padding: 10px; }
-            .actions { gap: 6px; }
-            .btn { padding: 6px 12px; font-size: 0.75rem; }
-            .download-group .btn { min-width: 100px; font-size: 0.7rem; padding: 6px 10px; }
-            .input-with-slider .num-input { width: 44px; font-size: 0.7rem; padding: 2px 4px; }
+            .container {
+                padding: 10px 8px 16px;
+                border-radius: 32px 24px 32px 24px;
+            }
+
+            .params-grid {
+                padding: 10px;
+            }
+
+            .actions {
+                gap: 6px;
+            }
+
+            .btn {
+                padding: 6px 12px;
+                font-size: 0.75rem;
+            }
+
+            .btn-generate {
+                font-size: 0.85rem;
+                padding: 10px 16px;
+                min-width: 120px;
+            }
+
+            .download-group .btn {
+                min-width: 100px;
+                font-size: 0.7rem;
+                padding: 6px 10px;
+            }
+
+            .input-with-slider .num-input {
+                width: 44px;
+                font-size: 0.7rem;
+                padding: 2px 4px;
+            }
+
+            .render-off .preview-canvas-wrap::after {
+                font-size: 12px;
+                padding: 6px 14px;
+            }
         }
     </style>
 </head>
+
 <body>
-<div class="container">
-    <div class="header">
-        <h1>⚙️ G-code Generator <small>CNC 3018 · GRBL</small></h1>
-        <span class="sub">Контур · Рамка · Окно</span>
-    </div>
-
-    <div class="params-grid">
-        <div class="param-group full">
-            <div class="param-label">Форма</div>
-            <div class="shape-selector">
-                <button class="shape-btn active" data-shape="square"><span>▢</span> Квадрат</button>
-                <button class="shape-btn" data-shape="rectangle"><span>▭</span> Прямоугольник</button>
-                <button class="shape-btn" data-shape="circle"><span>◯</span> Круг</button>
-            </div>
+    <div class="container">
+        <div class="header">
+            <h1>⚙️ G-code Generator <small>CNC 3018 · GRBL</small></h1>
+            <span class="sub">Контур · Рамка · Заливка</span>
         </div>
 
-        <div class="param-group full">
-            <div class="param-label">Режим</div>
-            <div class="mode-selector">
-                <button class="mode-btn active" data-mode="outline">📐 Контур</button>
-                <button class="mode-btn" data-mode="frame">🖼️ Рамка</button>
-                <button class="mode-btn" data-mode="window">🪟 Окно</button>
-            </div>
-            <div class="hint" id="modeHint">Внешний контур — материал остаётся внутри</div>
-        </div>
-
-        <!-- ЛАЗЕРНЫЙ РЕЖИМ -->
-        <div class="param-group full">
-            <div class="checkbox-group">
-                <input type="checkbox" id="laserCheckbox">
-                <label for="laserCheckbox">
-                    🔥 Лазерный режим (LaserGRBL)
-                    <span class="laser-badge">S-мощность</span>
-                    <span class="hint-inline">— G-код без Z, с M3/M5</span>
-                </label>
-            </div>
-            <div class="hint">Включает генерацию для лазера: траектория без подъёмов, мощность S</div>
-        </div>
-
-        <div class="param-group full hidden" id="laserPowerGroup">
-            <div class="param-label">
-                <span>🔆 Мощность лазера (S)</span>
-                <span class="value" id="laserPowerDisplay">255</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="laserPowerSlider" min="0" max="1000" value="255" step="1">
-                <input type="number" class="num-input" id="laserPowerInput" value="255" step="1" min="0" max="1000">
-            </div>
-            <div class="hint">Значение S для M3 (0-1000, для LaserGRBL обычно 0-1000)</div>
-        </div>
-
-        <div class="param-group">
-            <div class="param-label">
-                <span id="sizeLabel">Размер (сторона)</span>
-                <span class="value" id="sizeDisplay">50</span><span class="unit">мм</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="sizeSlider" min="1" max="300" value="50" step="0.5">
-                <input type="number" class="num-input" id="sizeInput" value="50" step="0.5" min="1" max="300">
-            </div>
-        </div>
-
-        <div class="param-group hidden" id="heightGroup">
-            <div class="param-label">
-                <span>Высота</span>
-                <span class="value" id="heightDisplay">30</span><span class="unit">мм</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="heightSlider" min="1" max="200" value="30" step="0.5">
-                <input type="number" class="num-input" id="heightInput" value="30" step="0.5" min="1" max="200">
-            </div>
-        </div>
-
-        <div class="param-group" id="radiusSingleGroup">
-            <div class="param-label">
-                <span>Радиус скругления</span>
-                <span class="value" id="radiusDisplay">0</span><span class="unit">мм</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="radiusSlider" min="0" max="40" value="0" step="0.5">
-                <input type="number" class="num-input" id="radiusInput" value="0" step="0.5" min="0" max="40">
-            </div>
-        </div>
-
-        <div class="param-group full hidden" id="radiusSplitGroup">
-            <div class="param-label" style="margin-bottom:4px;">
-                <span>🔘 Радиусы скругления (рамка)</span>
-                <span class="radius-badge">внешний / внутренний</span>
-            </div>
-            <div class="radius-split">
-                <div class="param-group">
-                    <div class="param-label">
-                        <span>Внешний R</span>
-                        <span class="value" id="radiusOuterDisplay">0</span><span class="unit">мм</span>
-                    </div>
-                    <div class="input-with-slider">
-                        <input type="range" id="radiusOuterSlider" min="0" max="40" value="0" step="0.5">
-                        <input type="number" class="num-input" id="radiusOuterInput" value="0" step="0.5" min="0" max="40">
-                    </div>
-                </div>
-                <div class="param-group">
-                    <div class="param-label">
-                        <span>Внутренний R</span>
-                        <span class="value" id="radiusInnerDisplay">0</span><span class="unit">мм</span>
-                    </div>
-                    <div class="input-with-slider">
-                        <input type="range" id="radiusInnerSlider" min="0" max="40" value="0" step="0.5">
-                        <input type="number" class="num-input" id="radiusInnerInput" value="0" step="0.5" min="0" max="40">
-                    </div>
+        <div class="params-grid">
+            <div class="param-group full">
+                <div class="param-label">Форма</div>
+                <div class="shape-selector">
+                    <button class="shape-btn active" data-shape="square"><span>▢</span> Квадрат</button>
+                    <button class="shape-btn" data-shape="rectangle"><span>▭</span> Прямоугольник</button>
+                    <button class="shape-btn" data-shape="circle"><span>◯</span> Круг</button>
+                    <button class="shape-btn" data-shape="hexagon"><span>⬡</span> Шестигранник</button>
                 </div>
             </div>
-            <div class="hint" style="margin-top:4px;">Разные радиусы для внешнего и внутреннего контура рамки</div>
-        </div>
 
-        <!-- Толщина стенки — ВСЕГДА видна для рамки -->
-        <div class="param-group hidden" id="thicknessGroup">
-            <div class="param-label">
-                Толщина стенки
-                <span class="value" id="thicknessDisplay">5</span><span class="unit">мм</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="thicknessSlider" min="0.1" max="299" value="5" step="0.1">
-                <input type="number" class="num-input" id="thicknessInput" value="5" step="0.1" min="0.1" max="299">
-            </div>
-            <div class="hint">Только для режима «Рамка»</div>
-        </div>
-
-        <!-- Чекбокс сверления (только для окна и ТОЛЬКО НЕ ЛАЗЕР) -->
-        <div class="param-group full hidden" id="drillGroup">
-            <div class="checkbox-group">
-                <input type="checkbox" id="drillCheckbox">
-                <label for="drillCheckbox">
-                    🔧 Сверление (выгон стружки)
-                    <span class="hint-inline">— центровка + периодический подъём фрезы</span>
-                </label>
-            </div>
-            <div class="hint">Добавляет центровое сверло и выходы на Z5 для удаления стружки</div>
-        </div>
-
-        <!-- Подача — ВСЕГДА видна (и для лазера, и для фрезы) -->
-        <div class="param-group">
-            <div class="param-label">
-                Подача (F)
-                <span class="value" id="feedDisplay">600</span><span class="unit">мм/мин</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="feedSlider" min="100" max="1800" value="600" step="10">
-                <input type="number" class="num-input" id="feedInput" value="600" step="10" min="100" max="1800">
-            </div>
-        </div>
-
-        <!-- Фрезерные параметры (скрываются при лазере) -->
-        <div class="param-group" id="depthGroup">
-            <div class="param-label">
-                Глубина за проход
-                <span class="value" id="depthDisplay">1.0</span><span class="unit">мм</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="depthSlider" min="0.05" max="5" value="1.0" step="0.01">
-                <input type="number" class="num-input" id="depthInput" value="1.0" step="0.01" min="0.05" max="5">
-            </div>
-        </div>
-
-        <div class="param-group" id="passesGroup">
-            <div class="param-label">
-                Проходов
-                <span class="value" id="passesDisplay">1</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="passesSlider" min="1" max="100" value="1" step="1">
-                <input type="number" class="num-input" id="passesInput" value="1" step="1" min="1" max="100">
-            </div>
-        </div>
-
-        <div class="param-group" id="toolGroup">
-            <div class="param-label">
-                <span>🔧 Диаметр фрезы (D)</span>
-                <span class="value" id="toolDisplay">3.175</span><span class="unit">мм</span>
-            </div>
-            <div class="input-with-slider">
-                <input type="range" id="toolSlider" min="0.1" max="10" value="3.175" step="0.025">
-                <input type="number" class="num-input" id="toolInput" value="3.175" step="0.025" min="0.1" max="10">
-            </div>
-            <div class="hint">Траектория смещается на радиус фрезы для точного размера</div>
-        </div>
-
-        <div class="param-group full" style="margin-top:2px;">
-            <div class="actions">
-                <button class="btn btn-primary" id="generateBtn">✨ Сгенерировать</button>
-                <button class="btn btn-secondary" id="copyBtn">📋 Копировать</button>
-                <button class="btn btn-cutviewer" id="cutviewerBtn">🔍 Проверить в NC Viewer</button>
-                <button class="btn btn-secondary" id="resetViewBtn">⟳ Сброс вида</button>
-            </div>
-            <div class="download-group" style="margin-top:8px;">
-                <button class="btn btn-download" id="downloadBtn">📥 Скачать .nc</button>
-            </div>
-            <div class="compat-hint" id="compatHint">✅ Совместим с Candle, LaserGRBL и любым ПО для GRBL</div>
-        </div>
-    </div>
-
-    <div class="output-section">
-        <div class="output-card">
-            <div class="card-header">
-                <span>📄 G-code</span>
-                <span class="badge" id="lineCount">0 строк</span>
-            </div>
-            <textarea class="gcode-textarea" id="gcodeOutput" spellcheck="false" readonly></textarea>
-        </div>
-        <div class="output-card">
-            <div class="card-header">
-                <span>🖥️ Траектория</span>
-                <span class="badge" id="previewInfo">вид сверху</span>
-            </div>
-            <div class="preview-canvas-wrap">
-                <canvas id="previewCanvas"></canvas>
-                <div class="legend" id="legend">
-                    <span class="item"><span class="color-dot green"></span> Материал остаётся</span>
-                    <span class="item"><span class="color-dot red"></span> Материал удаляется</span>
+            <div class="param-group full">
+                <div class="param-label">Режим</div>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="outline">📐 Контур</button>
+                    <button class="mode-btn" data-mode="frame">🖼️ Рамка</button>
+                    <button class="mode-btn" data-mode="spiral">🌀 Спираль (заливка)</button>
+                    <button class="mode-btn" data-mode="pocket">🔘 Смещение (контур)</button>
                 </div>
-                <div class="preview-info" id="coordInfo">⬤ старт</div>
+                <div class="hint" id="modeHint">Контур — выберите внешний (столбик) или внутренний (вырез)</div>
             </div>
+
+            <!-- Сторона контура (только режим Контур) -->
+            <div class="param-group full" id="contourSideGroup">
+                <div class="param-label">Сторона фрезеровки</div>
+                <div class="mode-selector" id="contourSideSelector">
+                    <button class="side-btn active" data-side="outer" id="sideOuterBtn">🔼 Внешний</button>
+                    <button class="side-btn" data-side="inner" id="sideInnerBtn">🔽 Внутренний</button>
+                </div>
+                <div class="hint" id="contourSideHint">Внешний: фреза снаружи, материал остаётся внутри (столбик)</div>
+            </div>
+
+            <!-- ЛАЗЕРНЫЙ РЕЖИМ -->
+            <div class="param-group full">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="laserCheckbox">
+                    <label for="laserCheckbox">
+                        🔥 Лазерный режим (LaserGRBL)
+                        <span class="laser-badge">S-мощность</span>
+                        <span class="hint-inline">— G-код без Z, с M3/M5</span>
+                    </label>
+                </div>
+                <div class="hint">Включает генерацию для лазера: траектория без подъёмов, мощность S</div>
+            </div>
+
+            <div class="param-group full hidden" id="laserPowerGroup">
+                <div class="param-label">
+                    <span>🔆 Мощность лазера (S)</span>
+                    <span class="value" id="laserPowerDisplay">255</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="laserPowerSlider" min="0" max="1000" value="255" step="1">
+                    <input type="number" class="num-input" id="laserPowerInput" value="255" step="1" min="0" max="1000">
+                </div>
+                <div class="hint">Значение S для M3 (0-1000, для LaserGRBL обычно 0-1000)</div>
+            </div>
+
+            <div class="param-group">
+                <div class="param-label">
+                    <span id="sizeLabel">Размер (сторона)</span>
+                    <span class="value" id="sizeDisplay">50</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="sizeSlider" min="1" max="300" value="50" step="0.5">
+                    <input type="number" class="num-input" id="sizeInput" value="50" step="0.5" min="1" max="300">
+                </div>
+            </div>
+
+            <div class="param-group hidden" id="heightGroup">
+                <div class="param-label">
+                    <span>Высота</span>
+                    <span class="value" id="heightDisplay">30</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="heightSlider" min="1" max="200" value="30" step="0.5">
+                    <input type="number" class="num-input" id="heightInput" value="30" step="0.5" min="1" max="200">
+                </div>
+            </div>
+
+            <div class="param-group" id="radiusSingleGroup">
+                <div class="param-label">
+                    <span>Радиус скругления</span>
+                    <span class="value" id="radiusDisplay">0</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="radiusSlider" min="0" max="40" value="0" step="0.5">
+                    <input type="number" class="num-input" id="radiusInput" value="0" step="0.5" min="0" max="40">
+                </div>
+                <div class="hint" id="radiusHint">Скругление углов</div>
+            </div>
+
+            <div class="param-group full hidden" id="radiusSplitGroup">
+                <div class="param-label" style="margin-bottom:4px;">
+                    <span>🔘 Радиусы скругления (рамка)</span>
+                    <span class="radius-badge">внешний / внутренний</span>
+                </div>
+                <div class="radius-split">
+                    <div class="param-group">
+                        <div class="param-label">
+                            <span>Внешний R</span>
+                            <span class="value" id="radiusOuterDisplay">0</span><span class="unit">мм</span>
+                        </div>
+                        <div class="input-with-slider">
+                            <input type="range" id="radiusOuterSlider" min="0" max="40" value="0" step="0.5">
+                            <input type="number" class="num-input" id="radiusOuterInput" value="0" step="0.5" min="0"
+                                max="40">
+                        </div>
+                    </div>
+                    <div class="param-group">
+                        <div class="param-label">
+                            <span>Внутренний R</span>
+                            <span class="value" id="radiusInnerDisplay">0</span><span class="unit">мм</span>
+                        </div>
+                        <div class="input-with-slider">
+                            <input type="range" id="radiusInnerSlider" min="0" max="40" value="0" step="0.5">
+                            <input type="number" class="num-input" id="radiusInnerInput" value="0" step="0.5" min="0"
+                                max="40">
+                        </div>
+                    </div>
+                </div>
+                <div class="hint" style="margin-top:4px;">Разные радиусы для внешнего и внутреннего контура рамки</div>
+            </div>
+
+            <!-- Толщина стенки -->
+            <div class="param-group hidden" id="thicknessGroup">
+                <div class="param-label">
+                    Толщина стенки
+                    <span class="value" id="thicknessDisplay">5</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="thicknessSlider" min="0.1" max="299" value="5" step="0.1">
+                    <input type="number" class="num-input" id="thicknessInput" value="5" step="0.1" min="0.1" max="299">
+                </div>
+                <div class="hint">Только для режима «Рамка»</div>
+            </div>
+
+            <!-- Параметры спирали и смещения -->
+            <div class="param-group full hidden" id="spiralParams">
+                <div class="param-label">
+                    <span>📐 Шаг (перекрытие)</span>
+                    <span class="value" id="stepoverDisplay">40</span><span class="unit">%</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="stepoverSlider" min="10" max="80" value="40" step="1">
+                    <input type="number" class="num-input" id="stepoverInput" value="40" step="1" min="10" max="80">
+                </div>
+                <div class="hint">Перекрытие проходов в % от диаметра фрезы (чем меньше, тем чище поверхность)</div>
+            </div>
+
+            <div class="param-group full hidden" id="spiralDepthGroup">
+                <div class="param-label">
+                    <span>📏 Снятие за проход (по Z)</span>
+                    <span class="value" id="spiralDepthDisplay">0.5</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="spiralDepthSlider" min="0.05" max="3" value="0.5" step="0.05">
+                    <input type="number" class="num-input" id="spiralDepthInput" value="0.5" step="0.05" min="0.05"
+                        max="3">
+                </div>
+                <div class="hint">Глубина снимаемого слоя за один проход по спирали</div>
+            </div>
+
+            <div class="param-group full hidden" id="stockToLeaveGroup">
+                <div class="param-label">
+                    <span>📐 Припуск на чистовую (stock to leave)</span>
+                    <span class="value" id="stockToLeaveDisplay">0.25</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="stockToLeaveSlider" min="0" max="1" value="0.25" step="0.05">
+                    <input type="number" class="num-input" id="stockToLeaveInput" value="0.25" step="0.05" min="0"
+                        max="1">
+                </div>
+                <div class="hint">Остаток материала после черновой обработки для точного чистового прохода (0.15–0.4 мм)
+                </div>
+            </div>
+
+            <!-- Чекбокс сверления -->
+            <div class="param-group full hidden" id="drillGroup">
+                <div class="checkbox-group">
+                    <input type="checkbox" id="drillCheckbox">
+                    <label for="drillCheckbox">
+                        🔧 Центровое сверление
+                        <span class="hint-inline">— центровка перед фрезеровкой</span>
+                    </label>
+                </div>
+                <div class="hint">Добавляет центровое сверло перед началом фрезеровки</div>
+            </div>
+
+            <!-- Подача -->
+            <div class="param-group">
+                <div class="param-label">
+                    Подача (F)
+                    <span class="value" id="feedDisplay">600</span><span class="unit">мм/мин</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="feedSlider" min="100" max="1800" value="600" step="10">
+                    <input type="number" class="num-input" id="feedInput" value="600" step="10" min="100" max="1800">
+                </div>
+            </div>
+
+            <!-- Фрезерные параметры -->
+            <div class="param-group" id="depthGroup">
+                <div class="param-label">
+                    Глубина за проход
+                    <span class="value" id="depthDisplay">1.0</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="depthSlider" min="0.05" max="5" value="1.0" step="0.01">
+                    <input type="number" class="num-input" id="depthInput" value="1.0" step="0.01" min="0.05" max="5">
+                </div>
+            </div>
+
+            <div class="param-group" id="passesGroup">
+                <div class="param-label">
+                    Проходов
+                    <span class="value" id="passesDisplay">1</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="passesSlider" min="1" max="100" value="1" step="1">
+                    <input type="number" class="num-input" id="passesInput" value="1" step="1" min="1" max="100">
+                </div>
+            </div>
+
+            <div class="param-group" id="toolGroup">
+                <div class="param-label">
+                    <span>🔧 Диаметр фрезы (D)</span>
+                    <span class="value" id="toolDisplay">3.175</span><span class="unit">мм</span>
+                </div>
+                <div class="input-with-slider">
+                    <input type="range" id="toolSlider" min="0.1" max="10" value="3.175" step="0.025">
+                    <input type="number" class="num-input" id="toolInput" value="3.175" step="0.025" min="0.1" max="10">
+                </div>
+                <div class="hint">Траектория смещается на радиус фрезы для точного размера</div>
+            </div>
+
+            <!-- ===== НОВЫЙ ЧЕКБОКС ОТКЛЮЧЕНИЯ ВИЗУАЛИЗАЦИИ ===== -->
+            <div class="param-group full" style="margin-top:2px;">
+                <div class="render-toggle-group">
+                    <input type="checkbox" id="renderToggle" checked>
+                    <label for="renderToggle">
+                        👁️ Визуализация траектории
+                        <span class="hint-inline">— отключите для экономии ресурсов на сложных задачах</span>
+                    </label>
+                </div>
+                <div class="hint">При отключении траектория не рисуется, но G-code генерируется как обычно</div>
+            </div>
+
+            <div class="param-group full" style="margin-top:2px;">
+                <div class="actions">
+                    <button class="btn btn-generate" id="generateBtn">🔥 Сгенерировать</button>
+                    <button class="btn btn-secondary" id="copyBtn">📋 Копировать</button>
+                    <button class="btn btn-cutviewer" id="cutviewerBtn">🔍 NC Viewer</button>
+                    <button class="btn btn-secondary" id="resetViewBtn">⟳ Сброс</button>
+                </div>
+                <div class="download-group" style="margin-top:8px;">
+                    <button class="btn btn-download" id="downloadBtn">📥 Скачать .nc</button>
+                </div>
+                <div class="compat-hint" id="compatHint">✅ Совместим с Candle, LaserGRBL и любым ПО для GRBL</div>
+            </div>
+        </div>
+
+        <div class="output-section">
+            <div class="output-card">
+                <div class="card-header">
+                    <span>📄 G-code</span>
+                    <span class="badge" id="lineCount">0 строк</span>
+                </div>
+                <textarea class="gcode-textarea" id="gcodeOutput" spellcheck="false" readonly></textarea>
+            </div>
+            <div class="output-card" id="previewCard">
+                <div class="card-header">
+                    <span>🖥️ Траектория</span>
+                    <span class="badge" id="previewInfo">вид сверху</span>
+                </div>
+                <div class="preview-canvas-wrap">
+                    <canvas id="previewCanvas"></canvas>
+                    <div class="legend" id="legend">
+                        <span class="item"><span class="color-dot green"></span> Материал остаётся</span>
+                        <span class="item"><span class="color-dot red"></span> Материал удаляется</span>
+                    </div>
+                    <div class="preview-info" id="coordInfo">⬤ старт</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer-links">
+            <a href="https://volkovhl.github.io/" target="_blank" rel="author">volkovhl.github.io</a>
+            <span class="sep">-</span>
+            <a href="https://www.youtube.com/@Pavel_Volkov" target="_blank" rel="author">Дела Техники</a>
         </div>
     </div>
 
-    <div class="footer-links">
-        <a href="https://volkovhl.github.io/" target="_blank" rel="author">volkovhl.github.io</a>
-        <span class="sep">-</span>
-        <a href="https://www.youtube.com/@Pavel_Volkov" target="_blank" rel="author">Дела Техники</a>
-    </div>
-</div>
+    <div class="toast" id="toast"></div>
 
-<div class="toast" id="toast"></div>
+    <script>
+        (function () {
+            'use strict';
 
-<script>
-(function() {
-    'use strict';
+            // DOM refs
+            const shapeBtns = document.querySelectorAll('.shape-btn');
+            const modeBtns = document.querySelectorAll('.mode-btn');
+            const sizeSlider = document.getElementById('sizeSlider');
+            const heightSlider = document.getElementById('heightSlider');
+            const radiusSlider = document.getElementById('radiusSlider');
+            const radiusOuterSlider = document.getElementById('radiusOuterSlider');
+            const radiusInnerSlider = document.getElementById('radiusInnerSlider');
+            const thicknessSlider = document.getElementById('thicknessSlider');
+            const feedSlider = document.getElementById('feedSlider');
+            const depthSlider = document.getElementById('depthSlider');
+            const passesSlider = document.getElementById('passesSlider');
+            const toolSlider = document.getElementById('toolSlider');
+            const drillCheckbox = document.getElementById('drillCheckbox');
+            const stepoverSlider = document.getElementById('stepoverSlider');
+            const spiralDepthSlider = document.getElementById('spiralDepthSlider');
+            const stockToLeaveSlider = document.getElementById('stockToLeaveSlider');
+            const laserCheckbox = document.getElementById('laserCheckbox');
+            const laserPowerSlider = document.getElementById('laserPowerSlider');
+            const laserPowerInput = document.getElementById('laserPowerInput');
+            const laserPowerDisplay = document.getElementById('laserPowerDisplay');
+            // НОВЫЙ чекбокс
+            const renderToggle = document.getElementById('renderToggle');
 
-    // DOM refs
-    const shapeBtns = document.querySelectorAll('.shape-btn');
-    const modeBtns = document.querySelectorAll('.mode-btn');
-    const sizeSlider = document.getElementById('sizeSlider');
-    const heightSlider = document.getElementById('heightSlider');
-    const radiusSlider = document.getElementById('radiusSlider');
-    const radiusOuterSlider = document.getElementById('radiusOuterSlider');
-    const radiusInnerSlider = document.getElementById('radiusInnerSlider');
-    const thicknessSlider = document.getElementById('thicknessSlider');
-    const feedSlider = document.getElementById('feedSlider');
-    const depthSlider = document.getElementById('depthSlider');
-    const passesSlider = document.getElementById('passesSlider');
-    const toolSlider = document.getElementById('toolSlider');
-    const drillCheckbox = document.getElementById('drillCheckbox');
-    const laserCheckbox = document.getElementById('laserCheckbox');
-    const laserPowerSlider = document.getElementById('laserPowerSlider');
-    const laserPowerInput = document.getElementById('laserPowerInput');
-    const laserPowerDisplay = document.getElementById('laserPowerDisplay');
+            const sizeInput = document.getElementById('sizeInput');
+            const heightInput = document.getElementById('heightInput');
+            const radiusInput = document.getElementById('radiusInput');
+            const radiusOuterInput = document.getElementById('radiusOuterInput');
+            const radiusInnerInput = document.getElementById('radiusInnerInput');
+            const thicknessInput = document.getElementById('thicknessInput');
+            const feedInput = document.getElementById('feedInput');
+            const depthInput = document.getElementById('depthInput');
+            const passesInput = document.getElementById('passesInput');
+            const toolInput = document.getElementById('toolInput');
+            const stepoverInput = document.getElementById('stepoverInput');
+            const spiralDepthInput = document.getElementById('spiralDepthInput');
+            const stockToLeaveInput = document.getElementById('stockToLeaveInput');
 
-    const sizeInput = document.getElementById('sizeInput');
-    const heightInput = document.getElementById('heightInput');
-    const radiusInput = document.getElementById('radiusInput');
-    const radiusOuterInput = document.getElementById('radiusOuterInput');
-    const radiusInnerInput = document.getElementById('radiusInnerInput');
-    const thicknessInput = document.getElementById('thicknessInput');
-    const feedInput = document.getElementById('feedInput');
-    const depthInput = document.getElementById('depthInput');
-    const passesInput = document.getElementById('passesInput');
-    const toolInput = document.getElementById('toolInput');
+            const sizeDisplay = document.getElementById('sizeDisplay');
+            const heightDisplay = document.getElementById('heightDisplay');
+            const radiusDisplay = document.getElementById('radiusDisplay');
+            const radiusOuterDisplay = document.getElementById('radiusOuterDisplay');
+            const radiusInnerDisplay = document.getElementById('radiusInnerDisplay');
+            const thicknessDisplay = document.getElementById('thicknessDisplay');
+            const feedDisplay = document.getElementById('feedDisplay');
+            const depthDisplay = document.getElementById('depthDisplay');
+            const passesDisplay = document.getElementById('passesDisplay');
+            const toolDisplay = document.getElementById('toolDisplay');
+            const stepoverDisplay = document.getElementById('stepoverDisplay');
+            const spiralDepthDisplay = document.getElementById('spiralDepthDisplay');
+            const stockToLeaveDisplay = document.getElementById('stockToLeaveDisplay');
 
-    const sizeDisplay = document.getElementById('sizeDisplay');
-    const heightDisplay = document.getElementById('heightDisplay');
-    const radiusDisplay = document.getElementById('radiusDisplay');
-    const radiusOuterDisplay = document.getElementById('radiusOuterDisplay');
-    const radiusInnerDisplay = document.getElementById('radiusInnerDisplay');
-    const thicknessDisplay = document.getElementById('thicknessDisplay');
-    const feedDisplay = document.getElementById('feedDisplay');
-    const depthDisplay = document.getElementById('depthDisplay');
-    const passesDisplay = document.getElementById('passesDisplay');
-    const toolDisplay = document.getElementById('toolDisplay');
+            const sizeLabel = document.getElementById('sizeLabel');
+            const radiusSingleGroup = document.getElementById('radiusSingleGroup');
+            const radiusSplitGroup = document.getElementById('radiusSplitGroup');
+            const heightGroup = document.getElementById('heightGroup');
+            const thicknessGroup = document.getElementById('thicknessGroup');
+            const drillGroup = document.getElementById('drillGroup');
+            const spiralParams = document.getElementById('spiralParams');
+            const spiralDepthGroup = document.getElementById('spiralDepthGroup');
+            const stockToLeaveGroup = document.getElementById('stockToLeaveGroup');
+            const laserPowerGroup = document.getElementById('laserPowerGroup');
+            const depthGroup = document.getElementById('depthGroup');
+            const passesGroup = document.getElementById('passesGroup');
+            const toolGroup = document.getElementById('toolGroup');
+            const compatHint = document.getElementById('compatHint');
+            const radiusHint = document.getElementById('radiusHint');
+            const gcodeOutput = document.getElementById('gcodeOutput');
+            const canvas = document.getElementById('previewCanvas');
+            const ctx = canvas.getContext('2d');
+            const generateBtn = document.getElementById('generateBtn');
+            const copyBtn = document.getElementById('copyBtn');
+            const resetViewBtn = document.getElementById('resetViewBtn');
+            const downloadBtn = document.getElementById('downloadBtn');
+            const cutviewerBtn = document.getElementById('cutviewerBtn');
+            const lineCount = document.getElementById('lineCount');
+            const coordInfo = document.getElementById('coordInfo');
+            const modeHint = document.getElementById('modeHint');
+            const legend = document.getElementById('legend');
+            const toastEl = document.getElementById('toast');
+            const contourSideGroup = document.getElementById('contourSideGroup');
+            const contourSideHint = document.getElementById('contourSideHint');
+            const sideOuterBtn = document.getElementById('sideOuterBtn');
+            const sideInnerBtn = document.getElementById('sideInnerBtn');
+            const previewCard = document.getElementById('previewCard');
 
-    const sizeLabel = document.getElementById('sizeLabel');
-    const radiusSingleGroup = document.getElementById('radiusSingleGroup');
-    const radiusSplitGroup = document.getElementById('radiusSplitGroup');
-    const heightGroup = document.getElementById('heightGroup');
-    const thicknessGroup = document.getElementById('thicknessGroup');
-    const drillGroup = document.getElementById('drillGroup');
-    const laserPowerGroup = document.getElementById('laserPowerGroup');
-    const depthGroup = document.getElementById('depthGroup');
-    const passesGroup = document.getElementById('passesGroup');
-    const toolGroup = document.getElementById('toolGroup');
-    const compatHint = document.getElementById('compatHint');
-    const gcodeOutput = document.getElementById('gcodeOutput');
-    const canvas = document.getElementById('previewCanvas');
-    const ctx = canvas.getContext('2d');
-    const generateBtn = document.getElementById('generateBtn');
-    const copyBtn = document.getElementById('copyBtn');
-    const resetViewBtn = document.getElementById('resetViewBtn');
-    const downloadBtn = document.getElementById('downloadBtn');
-    const cutviewerBtn = document.getElementById('cutviewerBtn');
-    const lineCount = document.getElementById('lineCount');
-    const coordInfo = document.getElementById('coordInfo');
-    const modeHint = document.getElementById('modeHint');
-    const legend = document.getElementById('legend');
-    const toastEl = document.getElementById('toast');
+            let currentShape = 'square';
+            let currentMode = 'outline';
+            let currentContourSide = 'outer';
+            let currentPath = [];
+            let currentGcode = '';
+            let toastTimer = null;
+            let isUpdating = false;
+            let isGenerating = false;
+            let firstGenerateDone = false;
 
-    let currentShape = 'square';
-    let currentMode = 'outline';
-    let currentPath = [];
-    let currentGcode = '';
-    let toastTimer = null;
-    let isUpdating = false;
-
-    // ===== Canvas sizing =====
-    function resizeCanvas() {
-        const wrap = canvas.parentElement;
-        const rect = wrap.getBoundingClientRect();
-        const w = rect.width - 16;
-        const h = Math.max(240, Math.min(500, rect.height - 16));
-        canvas.width = w * window.devicePixelRatio;
-        canvas.height = h * window.devicePixelRatio;
-        canvas.style.width = w + 'px';
-        canvas.style.height = h + 'px';
-        ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-        return { w, h };
-    }
-
-    // ===== Toast =====
-    function showToast(msg) {
-        toastEl.textContent = msg;
-        toastEl.classList.add('show');
-        clearTimeout(toastTimer);
-        toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
-    }
-
-    // ===== Парсинг числа =====
-    function parseNumberInput(value) {
-        if (typeof value === 'string') {
-            value = value.replace(',', '.');
-        }
-        return parseFloat(value);
-    }
-
-    // ===== Синхронизация слайдера и инпута =====
-    function syncSliderInput(slider, input, display, decimals) {
-        if (isUpdating) return;
-        isUpdating = true;
-        const val = parseFloat(slider.value);
-        if (!isNaN(val)) {
-            const formatted = decimals !== undefined ? val.toFixed(decimals) : val.toString();
-            input.value = formatted;
-            if (display) display.textContent = formatted;
-        }
-        isUpdating = false;
-    }
-
-    function syncInputSlider(slider, input, display, min, max, step, decimals) {
-        if (isUpdating) return;
-        isUpdating = true;
-        let raw = input.value.trim();
-        let val = parseNumberInput(raw);
-        if (isNaN(val)) val = parseFloat(slider.value) || 0;
-        val = Math.max(min, Math.min(max, val));
-        if (step && step > 0) val = Math.round(val / step) * step;
-        const formatted = decimals !== undefined ? val.toFixed(decimals) : val.toString();
-        slider.value = val;
-        input.value = formatted;
-        if (display) display.textContent = formatted;
-        isUpdating = false;
-        slider.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-
-    function bindSliderAndInput(slider, input, display, min, max, step, decimals) {
-        slider.addEventListener('input', function() {
-            syncSliderInput(slider, input, display, decimals);
-        });
-        input.addEventListener('blur', function() {
-            syncInputSlider(slider, input, display, min, max, step, decimals);
-        });
-        input.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                syncInputSlider(slider, input, display, min, max, step, decimals);
-                input.blur();
+            // ===== Canvas sizing =====
+            function resizeCanvas() {
+                const wrap = canvas.parentElement;
+                const rect = wrap.getBoundingClientRect();
+                const w = rect.width - 16;
+                const h = Math.max(240, Math.min(500, rect.height - 16));
+                canvas.width = w * window.devicePixelRatio;
+                canvas.height = h * window.devicePixelRatio;
+                canvas.style.width = w + 'px';
+                canvas.style.height = h + 'px';
+                ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
+                return {w, h};
             }
-        });
-        input.addEventListener('input', function() {
-            let raw = input.value.trim();
-            let val = parseNumberInput(raw);
-            if (!isNaN(val) && display) {
-                const clamped = Math.max(min, Math.min(max, val));
-                const formatted = decimals !== undefined ? clamped.toFixed(decimals) : clamped.toString();
-                display.textContent = formatted;
+
+            // ===== Toast =====
+            function showToast(msg) {
+                toastEl.textContent = msg;
+                toastEl.classList.add('show');
+                clearTimeout(toastTimer);
+                toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
             }
-        });
-    }
 
-    // ===== Генерация точек с учётом скругления (без смещения для лазера) =====
-    function generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode) {
-        const toolRadius = laserMode ? 0 : (toolDiameter / 2);
-        const halfW = size / 2;
-        const halfH = height / 2;
-        
-        let rOuter = 0, rInner = 0;
-        if (mode === 'frame') {
-            rOuter = Math.min(radiusOuter, Math.min(halfW, halfH) * 0.9);
-            const t = Math.min(thickness, Math.min(halfW, halfH) * 0.8);
-            const innerW = Math.max(0.5, size - 2 * t);
-            const innerH = Math.max(0.5, height - 2 * t);
-            rInner = Math.min(radiusInner, Math.min(innerW, innerH) * 0.9);
-        } else {
-            rOuter = Math.min(radius, Math.min(halfW, halfH) * 0.9);
-            rInner = rOuter;
-        }
-        
-        const t = (mode === 'frame') ? Math.min(thickness, Math.min(halfW, halfH) * 0.8) : 0;
-        const innerW = (mode === 'frame') ? Math.max(0.5, size - 2 * t) : size;
-        const innerH = (mode === 'frame') ? Math.max(0.5, height - 2 * t) : height;
+            // ===== Парсинг числа =====
+            function parseNumberInput(value) {
+                if (typeof value === 'string') {
+                    value = value.replace(',', '.');
+                }
+                return parseFloat(value);
+            }
 
-        if (shape === 'circle') {
-            const steps = 48;
-            let pts = [];
-            if (mode === 'outline' || mode === 'frame') {
-                for (let i = 0; i <= steps; i++) {
-                    const a = (i / steps) * 2 * Math.PI;
-                    pts.push({ x: halfW * Math.cos(a), y: halfW * Math.sin(a) });
+            // ===== Синхронизация слайдера и инпута =====
+            function syncSliderInput(slider, input, display, decimals) {
+                if (isUpdating) return;
+                isUpdating = true;
+                const val = parseFloat(slider.value);
+                if (!isNaN(val)) {
+                    const formatted = decimals !== undefined ? val.toFixed(decimals) : val.toString();
+                    input.value = formatted;
+                    if (display) display.textContent = formatted;
                 }
-                if (toolRadius > 0) {
-                    pts = offsetPoints(pts, toolRadius, true);
-                }
-                if (mode === 'frame') {
-                    let innerR = Math.max(0, halfW - t);
-                    let innerPts = [];
-                    for (let i = 0; i <= steps; i++) {
-                        const a = (i / steps) * 2 * Math.PI;
-                        innerPts.push({ x: innerR * Math.cos(a), y: innerR * Math.sin(a) });
+                isUpdating = false;
+            }
+
+            function syncInputSlider(slider, input, display, min, max, step, decimals) {
+                if (isUpdating) return;
+                isUpdating = true;
+                let raw = input.value.trim();
+                let val = parseNumberInput(raw);
+                if (isNaN(val)) val = parseFloat(slider.value) || 0;
+                val = Math.max(min, Math.min(max, val));
+                if (step && step > 0) val = Math.round(val / step) * step;
+                const formatted = decimals !== undefined ? val.toFixed(decimals) : val.toString();
+                slider.value = val;
+                input.value = formatted;
+                if (display) display.textContent = formatted;
+                isUpdating = false;
+            }
+
+            function bindSliderAndInput(slider, input, display, min, max, step, decimals) {
+                slider.addEventListener('input', function () {
+                    syncSliderInput(slider, input, display, decimals);
+                });
+                input.addEventListener('blur', function () {
+                    syncInputSlider(slider, input, display, min, max, step, decimals);
+                });
+                input.addEventListener('keydown', function (e) {
+                    if (e.key === 'Enter') {
+                        syncInputSlider(slider, input, display, min, max, step, decimals);
+                        input.blur();
                     }
-                    if (toolRadius > 0) {
-                        innerPts = offsetPoints(innerPts, toolRadius, false);
+                });
+                input.addEventListener('input', function () {
+                    let raw = input.value.trim();
+                    let val = parseNumberInput(raw);
+                    if (!isNaN(val) && display) {
+                        const clamped = Math.max(min, Math.min(max, val));
+                        const formatted = decimals !== undefined ? clamped.toFixed(decimals) : clamped.toString();
+                        display.textContent = formatted;
                     }
-                    pts = pts.concat(innerPts);
+                });
+            }
+
+            // ===== Генерация многоугольника (шестигранник) =====
+            function generatePolygon(sides, radius, cx, cy, startAngle) {
+                const pts = [];
+                for (let i = 0; i < sides; i++) {
+                    const angle = startAngle + (i / sides) * 2 * Math.PI;
+                    pts.push({
+                        x: cx + radius * Math.cos(angle),
+                        y: cy + radius * Math.sin(angle)
+                    });
                 }
                 return pts;
-            } else {
-                let innerR = Math.max(0, halfW - (mode === 'window' ? 0 : t));
-                let pts2 = [];
-                for (let i = 0; i <= steps; i++) {
-                    const a = (i / steps) * 2 * Math.PI;
-                    pts2.push({ x: innerR * Math.cos(a), y: innerR * Math.sin(a) });
-                }
-                if (toolRadius > 0) {
-                    pts2 = offsetPoints(pts2, toolRadius, false);
-                }
-                return pts2;
-            }
-        }
-
-        const steps = 14;
-
-        function addRoundedRect(cx, cy, w, h, rad, reverse) {
-            const pts = [];
-            const hw = w / 2, hh = h / 2;
-            const rr = Math.min(rad, Math.min(hw, hh) * 0.9);
-            if (rr < 0.01) {
-                pts.push({ x: -hw, y: -hh });
-                pts.push({ x: hw, y: -hh });
-                pts.push({ x: hw, y: hh });
-                pts.push({ x: -hw, y: hh });
-                pts.push({ x: -hw, y: -hh });
-            } else {
-                pts.push({ x: -hw + rr, y: -hh });
-                pts.push({ x: hw - rr, y: -hh });
-                for (let i = 0; i <= steps; i++) {
-                    const a = (i / steps) * Math.PI / 2;
-                    const cx2 = hw - rr, cy2 = -hh + rr;
-                    pts.push({ x: cx2 + rr * Math.cos(a - Math.PI/2), y: cy2 + rr * Math.sin(a - Math.PI/2) });
-                }
-                pts.push({ x: hw, y: -hh + rr });
-                pts.push({ x: hw, y: hh - rr });
-                for (let i = 0; i <= steps; i++) {
-                    const a = (i / steps) * Math.PI / 2;
-                    const cx2 = hw - rr, cy2 = hh - rr;
-                    pts.push({ x: cx2 + rr * Math.cos(a), y: cy2 + rr * Math.sin(a) });
-                }
-                pts.push({ x: hw - rr, y: hh });
-                pts.push({ x: -hw + rr, y: hh });
-                for (let i = 0; i <= steps; i++) {
-                    const a = (i / steps) * Math.PI / 2;
-                    const cx2 = -hw + rr, cy2 = hh - rr;
-                    pts.push({ x: cx2 + rr * Math.cos(a + Math.PI/2), y: cy2 + rr * Math.sin(a + Math.PI/2) });
-                }
-                pts.push({ x: -hw, y: hh - rr });
-                pts.push({ x: -hw, y: -hh + rr });
-                for (let i = 0; i <= steps; i++) {
-                    const a = (i / steps) * Math.PI / 2;
-                    const cx2 = -hw + rr, cy2 = -hh + rr;
-                    pts.push({ x: cx2 + rr * Math.cos(a + Math.PI), y: cy2 + rr * Math.sin(a + Math.PI) });
-                }
-                pts.push({ x: -hw + rr, y: -hh });
-            }
-            const result = pts.map(p => ({ x: p.x + cx, y: p.y + cy }));
-            if (reverse) result.reverse();
-            return result;
-        }
-
-        let result = [];
-        if (mode === 'outline') {
-            let pts = addRoundedRect(0, 0, size, height, rOuter, false);
-            if (toolRadius > 0) pts = offsetPoints(pts, toolRadius, true);
-            return pts;
-        } else if (mode === 'frame') {
-            let outer = addRoundedRect(0, 0, size, height, rOuter, false);
-            if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
-            let inner = addRoundedRect(0, 0, innerW, innerH, rInner, true);
-            if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
-            return outer.concat(inner);
-        } else {
-            let pts = addRoundedRect(0, 0, size, height, rOuter, false);
-            if (toolRadius > 0) pts = offsetPoints(pts, toolRadius, false);
-            return pts;
-        }
-    }
-
-    // ===== Функции смещения траектории =====
-    function offsetPoints(pts, amount, isOuter) {
-        if (amount === 0 || pts.length < 2) return pts.slice();
-        const result = [];
-        const n = pts.length;
-        const p = pts.slice();
-        for (let i = 0; i < n; i++) {
-            const prev = p[(i - 1 + n) % n];
-            const curr = p[i];
-            const next = p[(i + 1) % n];
-            
-            const dx1 = curr.x - prev.x;
-            const dy1 = curr.y - prev.y;
-            const len1 = Math.sqrt(dx1*dx1 + dy1*dy1) || 0.001;
-            const nx1 = -dy1 / len1;
-            const ny1 = dx1 / len1;
-            
-            const dx2 = next.x - curr.x;
-            const dy2 = next.y - curr.y;
-            const len2 = Math.sqrt(dx2*dx2 + dy2*dy2) || 0.001;
-            const nx2 = -dy2 / len2;
-            const ny2 = dx2 / len2;
-            
-            let nx = (nx1 + nx2) / 2;
-            let ny = (ny1 + ny2) / 2;
-            const lenN = Math.sqrt(nx*nx + ny*ny) || 0.001;
-            nx /= lenN;
-            ny /= lenN;
-            
-            const sign = isOuter ? 1 : -1;
-            result.push({
-                x: curr.x + sign * amount * nx,
-                y: curr.y + sign * amount * ny
-            });
-        }
-        return result;
-    }
-
-    // ===== Generate G-code (лазер выключен при подъезде) =====
-    function generateGCode(shape, size, height, radius, radiusOuter, radiusInner, feed, depth, passes, mode, thickness, toolDiameter, drillEnabled, laserMode, laserPower) {
-        const lines = [];
-        const toolRadius = laserMode ? 0 : (toolDiameter / 2);
-        const halfW = size / 2;
-        const halfH = height / 2;
-        const t = (mode === 'frame') ? Math.min(thickness, Math.min(halfW, halfH) * 0.8) : 0;
-        
-        let rOuter, rInner;
-        if (mode === 'frame') {
-            rOuter = Math.min(radiusOuter, Math.min(halfW, halfH) * 0.9);
-            const innerW = Math.max(0.5, size - 2 * t);
-            const innerH = Math.max(0.5, height - 2 * t);
-            rInner = Math.min(radiusInner, Math.min(innerW, innerH) * 0.9);
-        } else {
-            rOuter = Math.min(radius, Math.min(halfW, halfH) * 0.9);
-            rInner = rOuter;
-        }
-
-        const pathPts = generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, t, toolDiameter, laserMode);
-
-        lines.push('; ============================================');
-        lines.push(`; G-code generated for ${laserMode ? 'LASER (LaserGRBL)' : 'CNC 3018 (GRBL)'}`);
-        lines.push('; Compatible with: Candle, LaserGRBL, Universal G-code Sender');
-        const modeNames = { outline: 'Contour', frame: 'Frame', window: 'Window' };
-        lines.push(`; Mode: ${modeNames[mode] || mode}`);
-        let shapeName = shape.charAt(0).toUpperCase() + shape.slice(1);
-        if (shape === 'rectangle') shapeName += ` ${size}×${height}mm`;
-        else shapeName += ` ${size}mm`;
-        lines.push(`; Shape: ${shapeName}`);
-        if (laserMode) {
-            lines.push(`; LASER MODE: Power S=${laserPower}, Feed F=${feed}`);
-            lines.push(`; ⚠️ Laser is OFF (M5) during positioning, ON (M3) only when cutting`);
-            if (rOuter > 0.1) lines.push(`; Corner radius: ${rOuter.toFixed(1)} mm`);
-            if (mode === 'frame' && rInner > 0.1 && Math.abs(rInner - rOuter) > 0.01) {
-                lines.push(`; Inner corner radius: ${rInner.toFixed(1)} mm`);
-            }
-            if (mode === 'frame') lines.push(`; Wall thickness: ${t.toFixed(1)} mm`);
-            if (mode === 'frame') lines.push('; 🔄 Laser OFF (M5) between outer and inner contours');
-        } else {
-            lines.push(`; Tool diameter: ${toolDiameter.toFixed(2)} mm (offset applied)`);
-            if (rOuter > 0.1) lines.push(`; Corner radius: ${rOuter.toFixed(1)} mm`);
-            if (mode === 'frame' && rInner > 0.1 && Math.abs(rInner - rOuter) > 0.01) {
-                lines.push(`; Inner corner radius: ${rInner.toFixed(1)} mm`);
-            }
-            if (mode === 'frame') lines.push(`; Wall thickness: ${t.toFixed(1)} mm`);
-            lines.push(`; Feed: ${feed} mm/min`);
-            lines.push(`; Depth/pass: ${depth} mm, Passes: ${passes}`);
-            if (drillEnabled && mode === 'window') {
-                lines.push('; 🔧 DRILL MODE ENABLED: center drill + chip clearing');
-            }
-        }
-        lines.push('; ============================================');
-        lines.push('');
-        lines.push('G21 ; Units mm');
-        lines.push('G90 ; Absolute');
-        lines.push('G17 ; XY plane');
-        lines.push('G94 ; Feed/min');
-        lines.push('');
-
-        if (laserMode) {
-            // ===== ЛАЗЕРНЫЙ РЕЖИМ =====
-            lines.push('; --- LASER MODE ---');
-            lines.push('M5 ; Laser OFF (safe start)');
-            lines.push('G0 X0 Y0');
-            lines.push('');
-            
-            if (mode === 'frame') {
-                // Для рамки — рисуем внешний и внутренний контур с M5 между ними
-                const halfLen = Math.floor(pathPts.length / 2);
-                const outerPts = pathPts.slice(0, halfLen);
-                const innerPts = pathPts.slice(halfLen);
-                
-                // Внешний контур
-                if (outerPts.length > 1) {
-                    lines.push(`; --- Outer contour ---`);
-                    lines.push(`G0 X${outerPts[0].x.toFixed(3)} Y${outerPts[0].y.toFixed(3)}`);
-                    lines.push(`M3 S${laserPower} ; Laser ON - start cutting outer contour`);
-                    for (let i = 1; i < outerPts.length; i++) {
-                        lines.push(`G1 X${outerPts[i].x.toFixed(3)} Y${outerPts[i].y.toFixed(3)} F${feed}`);
-                    }
-                    lines.push('M5 ; Laser OFF - outer contour complete');
-                    lines.push('');
-                }
-                
-                // Внутренний контур
-                if (innerPts.length > 1) {
-                    lines.push(`; --- Inner contour ---`);
-                    lines.push(`G0 X${innerPts[0].x.toFixed(3)} Y${innerPts[0].y.toFixed(3)}`);
-                    lines.push(`M3 S${laserPower} ; Laser ON - start cutting inner contour`);
-                    for (let i = 1; i < innerPts.length; i++) {
-                        lines.push(`G1 X${innerPts[i].x.toFixed(3)} Y${innerPts[i].y.toFixed(3)} F${feed}`);
-                    }
-                    lines.push('M5 ; Laser OFF - inner contour complete');
-                    lines.push('');
-                }
-            } else {
-                // Для контура или окна — просто рисуем один контур
-                if (pathPts.length > 1) {
-                    lines.push(`G0 X${pathPts[0].x.toFixed(3)} Y${pathPts[0].y.toFixed(3)}`);
-                    lines.push(`M3 S${laserPower} ; Laser ON - start cutting`);
-                    for (let i = 1; i < pathPts.length; i++) {
-                        lines.push(`G1 X${pathPts[i].x.toFixed(3)} Y${pathPts[i].y.toFixed(3)} F${feed}`);
-                    }
-                    lines.push('M5 ; Laser OFF - cutting complete');
-                    lines.push('');
-                }
             }
 
-            lines.push('G0 X0 Y0');
-            lines.push('M30');
-        } else {
-            // ===== ФРЕЗЕРНЫЙ РЕЖИМ =====
-            lines.push('; --- Safe start ---');
-            lines.push('G0 Z5.0');
-            lines.push('G0 X0 Y0');
-            lines.push('');
+            // ===== Генерация спирали, заполняющей ВСЮ плоскость (от центра к краю) =====
+            function generateContourSpiral(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave = 0.25) {
+                const toolRadius = laserMode ? 0.1 : (toolDiameter / 2);
+                if (toolRadius < 0.01) return [];
 
-            if (drillEnabled && mode === 'window') {
+                const outerContour = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, 0);
+                if (outerContour.length < 2) return [];
+
                 let cx = 0, cy = 0;
-                if (pathPts.length > 0) {
-                    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                    for (const p of pathPts) {
-                        if (p.x < minX) minX = p.x;
-                        if (p.x > maxX) maxX = p.x;
-                        if (p.y < minY) minY = p.y;
-                        if (p.y > maxY) maxY = p.y;
-                    }
-                    cx = (minX + maxX) / 2;
-                    cy = (minY + maxY) / 2;
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                for (const p of outerContour) {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
                 }
-                lines.push('; --- Center drill (chip clearing) ---');
-                lines.push(`G0 X${cx.toFixed(3)} Y${cy.toFixed(3)}`);
-                const drillDepth = Math.min(depth * passes, -5);
-                lines.push(`G1 Z${(drillDepth * 0.3).toFixed(3)} F${feed * 0.5} ; Center drill`);
-                lines.push('G0 Z5.0 ; Retract');
-                lines.push('');
+                cx = (minX + maxX) / 2;
+                cy = (minY + maxY) / 2;
+
+                let maxR = 0;
+                for (const p of outerContour) {
+                    const dx = p.x - cx;
+                    const dy = p.y - cy;
+                    const r = Math.sqrt(dx * dx + dy * dy);
+                    if (r > maxR) maxR = r;
+                }
+
+                const stepover = (stepoverPercent / 100) * (laserMode ? 0.2 : toolDiameter);
+                const startR = laserMode ? 0.05 : Math.max(toolRadius * 0.4, 0.1);
+                const endR = Math.max(startR + 0.05, maxR - (laserMode ? 0.01 : toolRadius - Math.max(0, stockToLeave)));
+
+                const totalSteps = Math.max(1, Math.ceil((endR - startR) / stepover));
+                const pointsPerTurn = Math.max(24, Math.floor(2 * Math.PI * endR / (laserMode ? 0.15 : toolDiameter * 0.25)));
+                const totalPoints = Math.max(totalSteps * pointsPerTurn, 40);
+
+                const spiralPts = [];
+
+                for (let i = 0; i <= totalPoints; i++) {
+                    const t = i / totalPoints;
+                    const currentR = startR + t * (endR - startR);
+                    const angle = t * totalSteps * 2 * Math.PI * 1.8;
+
+                    let targetAngle = angle;
+                    let bestPt = null;
+                    let bestDist = Infinity;
+
+                    for (const p of outerContour) {
+                        const dx = p.x - cx;
+                        const dy = p.y - cy;
+                        const r = Math.sqrt(dx * dx + dy * dy);
+                        if (r < 0.01) continue;
+
+                        const a = Math.atan2(dy, dx);
+                        let diff = a - targetAngle;
+                        while (diff > Math.PI) diff -= 2 * Math.PI;
+                        while (diff < -Math.PI) diff += 2 * Math.PI;
+
+                        const dist = Math.abs(diff) + Math.abs(r - currentR) * 0.03;
+                        if (dist < bestDist) {
+                            bestDist = dist;
+                            bestPt = p;
+                        }
+                    }
+
+                    if (bestPt) {
+                        const dx = bestPt.x - cx;
+                        const dy = bestPt.y - cy;
+                        const r = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const scale = currentR / r;
+                        spiralPts.push({
+                            x: cx + dx * scale,
+                            y: cy + dy * scale
+                        });
+                    }
+                }
+
+                const finishPts = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolRadius);
+                return spiralPts.concat(finishPts);
             }
 
-            const chipClearInterval = 10;
-            
-            // --- Обработка рамки (frame) отдельно, чтобы поднимать Z между контурами ---
-            if (mode === 'frame') {
-                const halfLen = Math.floor(pathPts.length / 2);
-                const outerPts = pathPts.slice(0, halfLen);
-                const innerPts = pathPts.slice(halfLen);
-                
-                // Внешний контур
-                if (outerPts.length > 1) {
-                    for (let p = 1; p <= passes; p++) {
-                        const zDepth = -(depth * p);
-                        lines.push(`; --- Outer contour - Pass ${p}/${passes} ---`);
-                        let first = true;
-                        let accumulatedDist = 0;
-                        let lastX = 0, lastY = 0;
-                        
-                        for (let i = 0; i < outerPts.length; i++) {
-                            const pt = outerPts[i];
-                            if (first) {
-                                lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                lines.push(`G1 Z${zDepth.toFixed(3)} F${feed} ; Plunge`);
-                                lastX = pt.x;
-                                lastY = pt.y;
-                                first = false;
-                                continue;
-                            }
-                            const dist = Math.sqrt((pt.x - lastX)**2 + (pt.y - lastY)**2);
-                            accumulatedDist += dist;
-                            if (drillEnabled && mode === 'window' && accumulatedDist >= chipClearInterval) {
-                                lines.push(`G0 Z5.0 ; Chip clearing - retract`);
-                                lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                lines.push(`G1 Z${zDepth.toFixed(3)} F${feed} ; Resume`);
-                                accumulatedDist = 0;
-                            }
-                            lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
-                            lastX = pt.x;
-                            lastY = pt.y;
-                        }
-                        lines.push(`G0 Z5.0 ; Retract after outer pass`);
-                        lines.push('');
-                    }
-                }
-                
-                // Внутренний контур — ПОДНИМАЕМ Z перед переходом
-                if (innerPts.length > 1) {
-                    // ⚡ КЛЮЧЕВОЕ ИЗМЕНЕНИЕ: подъём Z перед переходом к внутреннему контуру
-                    lines.push(`; --- Moving to inner contour ---`);
-                    lines.push(`G0 Z5.0 ; Raise Z before moving to inner contour`);
-                    lines.push('');
-                    
-                    for (let p = 1; p <= passes; p++) {
-                        const zDepth = -(depth * p);
-                        lines.push(`; --- Inner contour - Pass ${p}/${passes} ---`);
-                        let first = true;
-                        let accumulatedDist = 0;
-                        let lastX = 0, lastY = 0;
-                        
-                        for (let i = 0; i < innerPts.length; i++) {
-                            const pt = innerPts[i];
-                            if (first) {
-                                lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                lines.push(`G1 Z${zDepth.toFixed(3)} F${feed} ; Plunge into inner contour`);
-                                lastX = pt.x;
-                                lastY = pt.y;
-                                first = false;
-                                continue;
-                            }
-                            const dist = Math.sqrt((pt.x - lastX)**2 + (pt.y - lastY)**2);
-                            accumulatedDist += dist;
-                            if (drillEnabled && mode === 'window' && accumulatedDist >= chipClearInterval) {
-                                lines.push(`G0 Z5.0 ; Chip clearing - retract`);
-                                lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                lines.push(`G1 Z${zDepth.toFixed(3)} F${feed} ; Resume`);
-                                accumulatedDist = 0;
-                            }
-                            lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
-                            lastX = pt.x;
-                            lastY = pt.y;
-                        }
-                        lines.push(`G0 Z5.0 ; Retract after inner pass`);
-                        lines.push('');
-                    }
-                }
-            } else {
-                // Обычный режим (outline или window) — без разделения на внешний/внутренний
-                for (let p = 1; p <= passes; p++) {
-                    const zDepth = -(depth * p);
-                    lines.push(`; --- Pass ${p}/${passes} ---`);
-                    let first = true;
-                    let accumulatedDist = 0;
-                    let lastX = 0, lastY = 0;
+            // ===== Генерация КОНЦЕНТРИЧЕСКИХ КОНТУРОВ (от края к центру) =====
+            function generatePocketContours(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, stockToLeave = 0.25) {
+                const toolRadius = laserMode ? 0.05 : (toolDiameter / 2);
+                if (toolRadius < 0.01) return [];
 
-                    for (let i = 0; i < pathPts.length; i++) {
-                        const pt = pathPts[i];
-                        if (first) {
-                            lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                            lines.push(`G1 Z${zDepth.toFixed(3)} F${feed} ; Plunge`);
-                            lastX = pt.x;
-                            lastY = pt.y;
-                            first = false;
-                            continue;
-                        }
-                        const dist = Math.sqrt((pt.x - lastX)**2 + (pt.y - lastY)**2);
-                        accumulatedDist += dist;
-                        if (drillEnabled && mode === 'window' && accumulatedDist >= chipClearInterval) {
-                            lines.push(`G0 Z5.0 ; Chip clearing - retract`);
-                            lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                            lines.push(`G1 Z${zDepth.toFixed(3)} F${feed} ; Resume`);
-                            accumulatedDist = 0;
-                        }
-                        lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
-                        lastX = pt.x;
-                        lastY = pt.y;
-                    }
-                    lines.push(`G0 Z5.0 ; Retract`);
-                    lines.push('');
+                const outer = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, 0);
+                if (outer.length < 2) return [];
+
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                for (const p of outer) {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
                 }
+                const cx = (minX + maxX) / 2;
+                const cy = (minY + maxY) / 2;
+
+                let maxR = 0;
+                for (const p of outer) {
+                    const dx = p.x - cx;
+                    const dy = p.y - cy;
+                    const r = Math.sqrt(dx * dx + dy * dy);
+                    if (r > maxR) maxR = r;
+                }
+
+                const step = (stepoverPercent / 100) * (laserMode ? 0.15 : toolDiameter);
+                const startR = maxR - (laserMode ? 0.01 : toolRadius);
+                const endR = laserMode ? 0.01 : toolRadius * 0.6;
+
+                const result = [];
+                const stepsCount = Math.max(1, Math.ceil((startR - endR) / step));
+
+                for (let i = 0; i < stepsCount; i++) {
+                    const t = (i + 1) / stepsCount;
+                    const currentR = startR - t * (startR - endR);
+                    const pts = outer.map(p => {
+                        const dx = p.x - cx;
+                        const dy = p.y - cy;
+                        const r = Math.sqrt(dx * dx + dy * dy) || 1;
+                        const scale = Math.max(0.01, currentR / r);
+                        const stockScale = 1 - (stockToLeave / (currentR + 0.01));
+                        const finalScale = scale * Math.max(0.1, stockScale);
+                        return {x: cx + dx * finalScale, y: cy + dy * finalScale};
+                    });
+                    result.push(pts);
+                }
+
+                const finishPts = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, 0);
+                result.push(finishPts);
+
+                return result.flat();
             }
 
-            lines.push('; --- End ---');
-            lines.push('G0 X0 Y0');
-            lines.push('M30');
-        }
+            // ===== Получение контура фигуры =====
+            function getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolRadius, contourSide = 'outer') {
+                const halfW = size / 2;
+                const halfH = height / 2;
 
-        return lines.join('\n');
-    }
-
-    // ===== Update preview =====
-    function updatePreview(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode) {
-        const rect = canvas.getBoundingClientRect();
-        const W = rect.width;
-        const H = rect.height;
-
-        ctx.clearRect(0, 0, W, H);
-
-        const t = (mode === 'frame') ? Math.min(thickness, Math.min(size, height) * 0.4) : 0;
-        const pts = generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, t, toolDiameter, laserMode);
-        if (pts.length < 2) return;
-
-        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-        for (const p of pts) {
-            if (p.x < minX) minX = p.x;
-            if (p.x > maxX) maxX = p.x;
-            if (p.y < minY) minY = p.y;
-            if (p.y > maxY) maxY = p.y;
-        }
-        const rangeX = maxX - minX || 1;
-        const rangeY = maxY - minY || 1;
-        const margin = 0.12;
-        const scale = Math.min(
-            (W * (1 - 2 * margin)) / rangeX,
-            (H * (1 - 2 * margin)) / rangeY
-        );
-        const cx = (minX + maxX) / 2;
-        const cy = (minY + maxY) / 2;
-        const offX = W / 2 - cx * scale;
-        const offY = H / 2 + cy * scale;
-
-        function toScreen(px, py) {
-            return [offX + px * scale, offY - py * scale];
-        }
-
-        // Grid
-        ctx.save();
-        ctx.strokeStyle = 'rgba(180, 140, 100, 0.15)';
-        ctx.lineWidth = 0.5;
-        const gs = 10;
-        for (let v = Math.floor(minX / gs) * gs; v <= maxX; v += gs) {
-            const [sx] = toScreen(v, 0);
-            ctx.beginPath();
-            ctx.moveTo(sx, 0);
-            ctx.lineTo(sx, H);
-            ctx.stroke();
-        }
-        for (let v = Math.floor(minY / gs) * gs; v <= maxY; v += gs) {
-            const [, sy] = toScreen(0, v);
-            ctx.beginPath();
-            ctx.moveTo(0, sy);
-            ctx.lineTo(W, sy);
-            ctx.stroke();
-        }
-        ctx.restore();
-
-        // Axes
-        ctx.save();
-        ctx.strokeStyle = 'rgba(180, 140, 100, 0.2)';
-        ctx.lineWidth = 1;
-        ctx.setLineDash([4, 6]);
-        const [ox, oy] = toScreen(0, 0);
-        ctx.beginPath();
-        ctx.moveTo(0, oy);
-        ctx.lineTo(W, oy);
-        ctx.stroke();
-        ctx.beginPath();
-        ctx.moveTo(ox, 0);
-        ctx.lineTo(ox, H);
-        ctx.stroke();
-        ctx.setLineDash([]);
-        ctx.restore();
-
-        // Draw path
-        if (pts.length > 1) {
-            const len = pts.length;
-            const halfLen = Math.floor(len / 2);
-            const isFrame = (mode === 'frame');
-            const isWindow = (mode === 'window');
-
-            for (let i = 0; i < len - 1; i++) {
-                let color;
-                if (laserMode) {
-                    const r = Math.round(200 + 55 * (i / len));
-                    const g = Math.round(60 - 40 * (i / len));
-                    const b = Math.round(30 - 20 * (i / len));
-                    color = `rgb(${r},${g},${b})`;
+                let rOuter = 0, rInner = 0;
+                if (mode === 'frame') {
+                    rOuter = Math.min(radiusOuter, Math.min(halfW, halfH) * 0.9);
+                    const t = Math.min(thickness, Math.min(halfW, halfH) * 0.8);
+                    const innerW = Math.max(0.5, size - 2 * t);
+                    const innerH = Math.max(0.5, height - 2 * t);
+                    rInner = Math.min(radiusInner, Math.min(innerW, innerH) * 0.9);
                 } else {
-                    const isInner = (isFrame && i >= halfLen);
-                    if (isInner || isWindow) {
-                        const r = Math.round(220 - 60 * (i / len));
-                        const g = Math.round(80 - 40 * (i / len));
-                        const b = Math.round(80 - 40 * (i / len));
-                        color = `rgb(${r},${g},${b})`;
-                    } else {
-                        const r = Math.round(80 - 40 * (i / len));
-                        const g = Math.round(180 + 60 * (1 - i / len));
-                        const b = Math.round(80 - 40 * (i / len));
-                        color = `rgb(${r},${g},${b})`;
+                    rOuter = Math.min(radius, Math.min(halfW, halfH) * 0.9);
+                    rInner = rOuter;
+                }
+
+                const t = (mode === 'frame') ? Math.min(thickness, Math.min(halfW, halfH) * 0.8) : 0;
+                const outlineIsOuter = (contourSide === 'inner');
+
+                if (shape === 'hexagon') {
+                    const steps = 16;
+                    const R = halfW;
+                    const sides = 6;
+                    const startAngle = -Math.PI / 2;
+
+                    function getHexPoints(rad, cx, cy, roundR) {
+                        const rawPts = generatePolygon(sides, rad, cx, cy, startAngle);
+                        if (roundR < 0.01) {
+                            const pts = rawPts.slice();
+                            pts.push(rawPts[0]);
+                            return pts;
+                        }
+                        const pts = [];
+                        const n = rawPts.length;
+                        const rr = Math.min(roundR, rad * 0.4);
+                        for (let i = 0; i < n; i++) {
+                            const p0 = rawPts[(i - 1 + n) % n];
+                            const p1 = rawPts[i];
+                            const p2 = rawPts[(i + 1) % n];
+
+                            const v1 = {x: p0.x - p1.x, y: p0.y - p1.y};
+                            const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y) || 0.001;
+                            const v2 = {x: p2.x - p1.x, y: p2.y - p1.y};
+                            const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y) || 0.001;
+
+                            const d = Math.min(rr, len1 * 0.45, len2 * 0.45);
+                            const a1 = {x: p1.x + (v1.x / len1) * d, y: p1.y + (v1.y / len1) * d};
+                            const a2 = {x: p1.x + (v2.x / len2) * d, y: p1.y + (v2.y / len2) * d};
+
+                            pts.push({x: a1.x, y: a1.y});
+
+                            const center = {x: p1.x, y: p1.y};
+                            const angle1 = Math.atan2(a1.y - center.y, a1.x - center.x);
+                            const angle2 = Math.atan2(a2.y - center.y, a2.x - center.x);
+                            let startA = angle1;
+                            let endA = angle2;
+                            let diff = endA - startA;
+                            if (diff < 0) diff += 2 * Math.PI;
+                            const segs = Math.max(3, Math.round(steps * diff / (2 * Math.PI / 6)));
+                            for (let j = 0; j <= segs; j++) {
+                                const frac = j / segs;
+                                const a = startA + frac * diff;
+                                pts.push({
+                                    x: center.x + d * Math.cos(a),
+                                    y: center.y + d * Math.sin(a)
+                                });
+                            }
+                        }
+                        if (pts.length > 0) pts.push(pts[0]);
+                        return pts;
+                    }
+
+                    if (mode === 'outline' || mode === 'window' || mode === 'spiral' || mode === 'pocket') {
+                        let pts = getHexPoints(R, 0, 0, rOuter);
+                        if (toolRadius > 0) {
+                            const isOuterOff = (mode === 'outline') ? outlineIsOuter : false;
+                            pts = offsetPoints(pts, toolRadius, isOuterOff);
+                        }
+                        return pts;
+                    } else if (mode === 'frame') {
+                        let outer = getHexPoints(R, 0, 0, rOuter);
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
+                        let innerR = Math.max(0, R - t);
+                        let inner = getHexPoints(innerR, 0, 0, rInner);
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
+                        return outer.concat(inner);
                     }
                 }
 
-                ctx.beginPath();
-                const [x1, y1] = toScreen(pts[i].x, pts[i].y);
-                const [x2, y2] = toScreen(pts[i + 1].x, pts[i + 1].y);
-                ctx.moveTo(x1, y1);
-                ctx.lineTo(x2, y2);
-                ctx.strokeStyle = color;
-                ctx.lineWidth = laserMode ? 3.5 : 2.8;
-                ctx.shadowColor = color;
-                ctx.shadowBlur = laserMode ? 8 : 4;
-                ctx.stroke();
-                ctx.shadowBlur = 0;
+                if (shape === 'circle') {
+                    const steps = 48;
+                    let pts = [];
+                    if (mode === 'outline' || mode === 'window' || mode === 'spiral' || mode === 'pocket') {
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * 2 * Math.PI;
+                            pts.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
+                        }
+                        if (toolRadius > 0) {
+                            const isOuterOff = (mode === 'outline') ? outlineIsOuter : false;
+                            pts = offsetPoints(pts, toolRadius, isOuterOff);
+                        }
+                        return pts;
+                    } else if (mode === 'frame') {
+                        let outer = [];
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * 2 * Math.PI;
+                            outer.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
+                        }
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
+                        let innerR = Math.max(0, halfW - t);
+                        let inner = [];
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * 2 * Math.PI;
+                            inner.push({x: innerR * Math.cos(a), y: innerR * Math.sin(a)});
+                        }
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
+                        return outer.concat(inner);
+                    }
+                }
+
+                const steps = 14;
+
+                function addRoundedRect(cx, cy, w, h, rad, reverse) {
+                    const pts = [];
+                    const hw = w / 2, hh = h / 2;
+                    const rr = Math.min(rad, Math.min(hw, hh) * 0.9);
+                    if (rr < 0.01) {
+                        pts.push({x: -hw, y: -hh});
+                        pts.push({x: hw, y: -hh});
+                        pts.push({x: hw, y: hh});
+                        pts.push({x: -hw, y: hh});
+                        pts.push({x: -hw, y: -hh});
+                    } else {
+                        pts.push({x: -hw + rr, y: -hh});
+                        pts.push({x: hw - rr, y: -hh});
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * Math.PI / 2;
+                            const cx2 = hw - rr, cy2 = -hh + rr;
+                            pts.push({x: cx2 + rr * Math.cos(a - Math.PI / 2), y: cy2 + rr * Math.sin(a - Math.PI / 2)});
+                        }
+                        pts.push({x: hw, y: -hh + rr});
+                        pts.push({x: hw, y: hh - rr});
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * Math.PI / 2;
+                            const cx2 = hw - rr, cy2 = hh - rr;
+                            pts.push({x: cx2 + rr * Math.cos(a), y: cy2 + rr * Math.sin(a)});
+                        }
+                        pts.push({x: hw - rr, y: hh});
+                        pts.push({x: -hw + rr, y: hh});
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * Math.PI / 2;
+                            const cx2 = -hw + rr, cy2 = hh - rr;
+                            pts.push({x: cx2 + rr * Math.cos(a + Math.PI / 2), y: cy2 + rr * Math.sin(a + Math.PI / 2)});
+                        }
+                        pts.push({x: -hw, y: hh - rr});
+                        pts.push({x: -hw, y: -hh + rr});
+                        for (let i = 0; i <= steps; i++) {
+                            const a = (i / steps) * Math.PI / 2;
+                            const cx2 = -hw + rr, cy2 = -hh + rr;
+                            pts.push({x: cx2 + rr * Math.cos(a + Math.PI), y: cy2 + rr * Math.sin(a + Math.PI)});
+                        }
+                        pts.push({x: -hw + rr, y: -hh});
+                    }
+                    const result = pts.map(p => ({x: p.x + cx, y: p.y + cy}));
+                    if (reverse) result.reverse();
+                    return result;
+                }
+
+                if (mode === 'outline' || mode === 'window' || mode === 'spiral' || mode === 'pocket') {
+                    let pts = addRoundedRect(0, 0, size, height, rOuter, false);
+                    if (toolRadius > 0) {
+                        const isOuterOff = (mode === 'outline') ? outlineIsOuter : false;
+                        pts = offsetPoints(pts, toolRadius, isOuterOff);
+                    }
+                    return pts;
+                } else if (mode === 'frame') {
+                    let outer = addRoundedRect(0, 0, size, height, rOuter, false);
+                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
+                    let innerW = Math.max(0.5, size - 2 * t);
+                    let innerH = Math.max(0.5, height - 2 * t);
+                    let inner = addRoundedRect(0, 0, innerW, innerH, rInner, true);
+                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
+                    return outer.concat(inner);
+                }
+                return [];
             }
 
-            // Start point
-            const [sx, sy] = toScreen(pts[0].x, pts[0].y);
-            ctx.beginPath();
-            ctx.arc(sx, sy, 5, 0, 2 * Math.PI);
-            ctx.fillStyle = laserMode ? '#ff6644' : '#7ab86a';
-            ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 12;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#fef0da';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+            // ===== Смещение траектории =====
+            function offsetPoints(pts, amount, isOuter) {
+                if (amount === 0 || pts.length < 2) return pts.slice();
+                const result = [];
+                const n = pts.length;
+                const p = pts.slice();
+                for (let i = 0; i < n; i++) {
+                    const prev = p[(i - 1 + n) % n];
+                    const curr = p[i];
+                    const next = p[(i + 1) % n];
 
-            // End point
-            const [ex, ey] = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y);
-            ctx.beginPath();
-            ctx.arc(ex, ey, 4, 0, 2 * Math.PI);
-            ctx.fillStyle = laserMode ? '#ffaa44' : '#d48a5a';
-            ctx.shadowColor = ctx.fillStyle;
-            ctx.shadowBlur = 10;
-            ctx.fill();
-            ctx.shadowBlur = 0;
-            ctx.strokeStyle = '#fef0da';
-            ctx.lineWidth = 1.5;
-            ctx.stroke();
+                    const dx1 = curr.x - prev.x;
+                    const dy1 = curr.y - prev.y;
+                    const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 0.001;
+                    const nx1 = -dy1 / len1;
+                    const ny1 = dx1 / len1;
 
-            // Legend
-            if (laserMode) {
-                legend.innerHTML = `
-                    <span class="item"><span class="color-dot laser"></span> 🔥 Лазер (S=${document.getElementById('laserPowerDisplay').textContent})</span>
-                    <span class="item"><span class="color-dot yellow"></span> ⬤ старт / ⬤ конец</span>
-                    ${mode === 'frame' ? '<span class="item"><span class="color-dot" style="background:#ff8844;"></span> M5 между контурами</span>' : ''}
-                    <span class="item"><span class="color-dot" style="background:#666;"></span> M5 при подъезде</span>
+                    const dx2 = next.x - curr.x;
+                    const dy2 = next.y - curr.y;
+                    const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 0.001;
+                    const nx2 = -dy2 / len2;
+                    const ny2 = dx2 / len2;
+
+                    let nx = (nx1 + nx2) / 2;
+                    let ny = (ny1 + ny2) / 2;
+                    const lenN = Math.sqrt(nx * nx + ny * ny) || 0.001;
+                    nx /= lenN;
+                    ny /= lenN;
+
+                    const sign = isOuter ? 1 : -1;
+                    result.push({
+                        x: curr.x + sign * amount * nx,
+                        y: curr.y + sign * amount * ny
+                    });
+                }
+                return result;
+            }
+
+            // ===== Генерация пути =====
+            function generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave = 0.25, contourSide = 'outer') {
+                if (mode === 'spiral') {
+                    return generateContourSpiral(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave);
+                } else if (mode === 'pocket') {
+                    return generatePocketContours(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, stockToLeave);
+                }
+                return getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, laserMode ? 0 : toolDiameter / 2, contourSide);
+            }
+
+            // ===== Generate G-code =====
+            function generateGCode(shape, size, height, radius, radiusOuter, radiusInner, feed, depth, passes, mode, thickness, toolDiameter, drillEnabled, laserMode, laserPower, stepoverPercent, spiralDepth, stockToLeave = 0.25, contourSide = 'outer') {
+                const lines = [];
+                const toolRadius = laserMode ? 0 : (toolDiameter / 2);
+                const halfW = size / 2;
+                const halfH = height / 2;
+                const t = (mode === 'frame') ? Math.min(thickness, Math.min(halfW, halfH) * 0.8) : 0;
+
+                let rOuter, rInner;
+                if (mode === 'frame') {
+                    rOuter = Math.min(radiusOuter, Math.min(halfW, halfH) * 0.9);
+                    const innerW = Math.max(0.5, size - 2 * t);
+                    const innerH = Math.max(0.5, height - 2 * t);
+                    rInner = Math.min(radiusInner, Math.min(innerW, innerH) * 0.9);
+                } else {
+                    rOuter = Math.min(radius, Math.min(halfW, halfH) * 0.9);
+                    rInner = rOuter;
+                }
+
+                const pathPts = generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+
+                lines.push('; ============================================');
+                lines.push(`; G-code generated for ${laserMode ? 'LASER (LaserGRBL)' : 'CNC 3018 (GRBL)'}`);
+                lines.push('; Compatible with: Candle, LaserGRBL, Universal G-code Sender');
+                const modeNames = {outline: 'Contour', frame: 'Frame', spiral: 'Spiral (Filling)', pocket: 'Pocket (Offset)'};
+                lines.push(`; Mode: ${modeNames[mode] || mode}`);
+                if (mode === 'outline') {
+                    lines.push(`; Contour side: ${contourSide === 'inner' ? 'INNER (material remains outside)' : 'OUTER (material remains inside)'}`);
+                }
+                let shapeName = shape.charAt(0).toUpperCase() + shape.slice(1);
+                if (shape === 'rectangle') shapeName += ` ${size}×${height}mm`;
+                else if (shape === 'hexagon') shapeName += ` (опис. окруж. ${size}mm)`;
+                else shapeName += ` ${size}mm`;
+                lines.push(`; Shape: ${shapeName}`);
+                if (laserMode) {
+                    lines.push(`; LASER MODE: Power S=${laserPower}, Feed F=${feed}`);
+                    lines.push(`; ⚠️ Laser is OFF (M5) during positioning, ON (M3) only when cutting`);
+                    if (mode === 'spiral') {
+                        lines.push(`; 🌀 LASER SPIRAL FILLING: stepover ${stepoverPercent}%, from center to edge`);
+                    } else if (mode === 'pocket') {
+                        lines.push(`; 🔲 LASER CONCENTRIC POCKET: stepover ${stepoverPercent}%, from edge to center`);
+                    }
+                    if (rOuter > 0.1) lines.push(`; Corner radius: ${rOuter.toFixed(1)} mm`);
+                    if (mode === 'frame' && rInner > 0.1 && Math.abs(rInner - rOuter) > 0.01) {
+                        lines.push(`; Inner corner radius: ${rInner.toFixed(1)} mm`);
+                    }
+                    if (mode === 'frame') lines.push(`; Wall thickness: ${t.toFixed(1)} mm`);
+                    if (mode === 'frame') lines.push('; 🔄 Laser OFF (M5) between outer and inner contours');
+                } else {
+                    lines.push(`; Tool diameter: ${toolDiameter.toFixed(2)} mm (offset applied)`);
+                    if (rOuter > 0.1) lines.push(`; Corner radius: ${rOuter.toFixed(1)} mm`);
+                    if (mode === 'frame' && rInner > 0.1 && Math.abs(rInner - rOuter) > 0.01) {
+                        lines.push(`; Inner corner radius: ${rInner.toFixed(1)} mm`);
+                    }
+                    if (mode === 'frame') lines.push(`; Wall thickness: ${t.toFixed(1)} mm`);
+                    lines.push(`; Feed: ${feed} mm/min`);
+                    lines.push(`; Depth/pass: ${depth} mm, Passes: ${passes}`);
+                    if (drillEnabled && (mode === 'spiral' || mode === 'pocket')) {
+                        lines.push('; 🔧 CENTER DRILL ENABLED');
+                    }
+                    if (mode === 'spiral') {
+                        lines.push(`; 🌀 SPIRAL MILLING (FILLING THE ENTIRE PLANE): stepover ${stepoverPercent}%, Z per pass ${spiralDepth}mm`);
+                        lines.push(`; Stock to leave (припуск): ${stockToLeave.toFixed(2)} mm → finish pass removes it for exact size`);
+                        lines.push(`; Spiral (roughing) from center → finish contour pass for precision`);
+                    }
+                    if (mode === 'pocket') {
+                        lines.push(`; 🔲 CONCENTRIC POCKET: stepover ${stepoverPercent}%, stock to leave ${stockToLeave.toFixed(2)} mm`);
+                        lines.push(`; Roughing from outer edge → center, then finish contour pass for exact size`);
+                    }
+                }
+                lines.push('; ============================================');
+                lines.push('');
+                lines.push('G21 ; Units mm');
+                lines.push('G90 ; Absolute');
+                lines.push('G17 ; XY plane');
+                lines.push('G94 ; Feed/min');
+                lines.push('');
+
+                if (laserMode) {
+                    lines.push('; --- LASER MODE ---');
+                    lines.push('M5 ; Laser OFF (safe start)');
+                    lines.push('G0 X0 Y0');
+                    lines.push('');
+
+                    if (mode === 'spiral' || mode === 'pocket') {
+                        if (pathPts.length > 1) {
+                            lines.push(`; --- Laser ${mode === 'spiral' ? 'spiral' : 'pocket'} filling ---`);
+                            lines.push(`G0 X${pathPts[0].x.toFixed(3)} Y${pathPts[0].y.toFixed(3)}`);
+                            lines.push(`M3 S${laserPower} ; Laser ON - start ${mode === 'spiral' ? 'spiral' : 'pocket'} filling`);
+                            for (let i = 1; i < pathPts.length; i++) {
+                                lines.push(`G1 X${pathPts[i].x.toFixed(3)} Y${pathPts[i].y.toFixed(3)} F${feed}`);
+                            }
+                            lines.push('M5 ; Laser OFF - filling complete');
+                            lines.push('');
+                        }
+                    } else if (mode === 'frame') {
+                        const halfLen = Math.floor(pathPts.length / 2);
+                        const outerPts = pathPts.slice(0, halfLen);
+                        const innerPts = pathPts.slice(halfLen);
+
+                        if (outerPts.length > 1) {
+                            lines.push(`; --- Outer contour ---`);
+                            lines.push(`G0 X${outerPts[0].x.toFixed(3)} Y${outerPts[0].y.toFixed(3)}`);
+                            lines.push(`M3 S${laserPower} ; Laser ON - start cutting outer contour`);
+                            for (let i = 1; i < outerPts.length; i++) {
+                                lines.push(`G1 X${outerPts[i].x.toFixed(3)} Y${outerPts[i].y.toFixed(3)} F${feed}`);
+                            }
+                            lines.push('M5 ; Laser OFF - outer contour complete');
+                            lines.push('');
+                        }
+
+                        if (innerPts.length > 1) {
+                            lines.push(`; --- Inner contour ---`);
+                            lines.push(`G0 X${innerPts[0].x.toFixed(3)} Y${innerPts[0].y.toFixed(3)}`);
+                            lines.push(`M3 S${laserPower} ; Laser ON - start cutting inner contour`);
+                            for (let i = 1; i < innerPts.length; i++) {
+                                lines.push(`G1 X${innerPts[i].x.toFixed(3)} Y${innerPts[i].y.toFixed(3)} F${feed}`);
+                            }
+                            lines.push('M5 ; Laser OFF - inner contour complete');
+                            lines.push('');
+                        }
+                    } else {
+                        if (pathPts.length > 1) {
+                            lines.push(`G0 X${pathPts[0].x.toFixed(3)} Y${pathPts[0].y.toFixed(3)}`);
+                            lines.push(`M3 S${laserPower} ; Laser ON - start cutting`);
+                            for (let i = 1; i < pathPts.length; i++) {
+                                lines.push(`G1 X${pathPts[i].x.toFixed(3)} Y${pathPts[i].y.toFixed(3)} F${feed}`);
+                            }
+                            lines.push('M5 ; Laser OFF - cutting complete');
+                            lines.push('');
+                        }
+                    }
+
+                    lines.push('G0 X0 Y0');
+                    lines.push('M30');
+                } else {
+                    lines.push('; --- Safe start ---');
+                    lines.push('G0 Z5.0');
+                    lines.push('G0 X0 Y0');
+                    lines.push('');
+
+                    if (drillEnabled && (mode === 'spiral' || mode === 'pocket')) {
+                        let cx = 0, cy = 0;
+                        if (pathPts.length > 0) {
+                            let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                            for (const p of pathPts) {
+                                if (p.x < minX) minX = p.x;
+                                if (p.x > maxX) maxX = p.x;
+                                if (p.y < minY) minY = p.y;
+                                if (p.y > maxY) maxY = p.y;
+                            }
+                            cx = (minX + maxX) / 2;
+                            cy = (minY + maxY) / 2;
+                        }
+                        lines.push('; --- Center drill ---');
+                        lines.push(`G0 X${cx.toFixed(3)} Y${cy.toFixed(3)}`);
+                        const drillDepth = Math.min(depth * passes, -5);
+                        lines.push(`G1 Z${(drillDepth * 0.3).toFixed(3)} F${feed * 0.5} ; Center drill`);
+                        lines.push('G0 Z5.0 ; Retract');
+                        lines.push('');
+                    }
+
+                    if (mode === 'spiral' || mode === 'pocket') {
+                        const isSpiral = (mode === 'spiral');
+                        lines.push(`; === ${isSpiral ? 'SPIRAL' : 'CONCENTRIC POCKET'} MILLING ===`);
+                        lines.push(`; ${isSpiral ? 'Roughing spiral stops with stock-to-leave' : 'Roughing from outer edge toward center with stock-to-leave'}, then exact finish contour`);
+
+                        const totalDepth = depth * passes;
+                        const numLayers = Math.max(1, Math.ceil(totalDepth / (isSpiral ? spiralDepth : depth)));
+                        const layerDepth = totalDepth / numLayers;
+
+                        let fullPath;
+                        if (isSpiral) {
+                            fullPath = generateContourSpiral(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave);
+                        } else {
+                            fullPath = generatePocketContours(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, stockToLeave);
+                        }
+                        const finishPts = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolRadius);
+                        const roughPts = fullPath.slice(0, Math.max(0, fullPath.length - finishPts.length));
+
+                        if (roughPts.length > 1) {
+                            for (let layer = 1; layer <= numLayers; layer++) {
+                                const zDepth = -(layerDepth * layer);
+                                lines.push(`; --- ${isSpiral ? 'Spiral' : 'Pocket'} roughing layer ${layer}/${numLayers} - Z${zDepth.toFixed(3)} (stock ${stockToLeave.toFixed(2)}mm) ---`);
+
+                                lines.push(`G0 X${roughPts[0].x.toFixed(3)} Y${roughPts[0].y.toFixed(3)}`);
+                                lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge to layer depth`);
+
+                                for (let i = 1; i < roughPts.length; i++) {
+                                    lines.push(`G1 X${roughPts[i].x.toFixed(3)} Y${roughPts[i].y.toFixed(3)} F${feed}`);
+                                }
+
+                                if (finishPts.length > 1) {
+                                    lines.push(`G0 Z5.0 ; Retract for finishing pass`);
+                                    lines.push(`G0 X${finishPts[0].x.toFixed(3)} Y${finishPts[0].y.toFixed(3)}`);
+                                    lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge for finish`);
+
+                                    for (let i = 1; i < finishPts.length; i++) {
+                                        lines.push(`G1 X${finishPts[i].x.toFixed(3)} Y${finishPts[i].y.toFixed(3)} F${feed}`);
+                                    }
+                                    lines.push(`; Finish pass complete (exact size)`);
+                                }
+
+                                lines.push(`G0 Z5.0 ; Retract after layer ${layer}`);
+                                lines.push('');
+                            }
+                        }
+
+                        lines.push(`; --- ${isSpiral ? 'Spiral' : 'Pocket'} milling + finish complete ---`);
+                        lines.push('');
+                    } else {
+                        if (mode === 'frame') {
+                            const halfLen = Math.floor(pathPts.length / 2);
+                            const outerPts = pathPts.slice(0, halfLen);
+                            const innerPts = pathPts.slice(halfLen);
+
+                            if (outerPts.length > 1) {
+                                for (let p = 1; p <= passes; p++) {
+                                    const zDepth = -(depth * p);
+                                    lines.push(`; --- Outer contour - Pass ${p}/${passes} ---`);
+                                    let first = true;
+                                    let lastX = 0, lastY = 0;
+
+                                    for (let i = 0; i < outerPts.length; i++) {
+                                        const pt = outerPts[i];
+                                        if (first) {
+                                            lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
+                                            lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge`);
+                                            lastX = pt.x;
+                                            lastY = pt.y;
+                                            first = false;
+                                            continue;
+                                        }
+                                        lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
+                                        lastX = pt.x;
+                                        lastY = pt.y;
+                                    }
+                                    lines.push(`G0 Z5.0 ; Retract after outer pass`);
+                                    lines.push('');
+                                }
+                            }
+
+                            if (innerPts.length > 1) {
+                                lines.push(`; --- Moving to inner contour ---`);
+                                lines.push(`G0 Z5.0 ; Raise Z before moving to inner contour`);
+                                lines.push('');
+
+                                for (let p = 1; p <= passes; p++) {
+                                    const zDepth = -(depth * p);
+                                    lines.push(`; --- Inner contour - Pass ${p}/${passes} ---`);
+                                    let first = true;
+                                    let lastX = 0, lastY = 0;
+
+                                    for (let i = 0; i < innerPts.length; i++) {
+                                        const pt = innerPts[i];
+                                        if (first) {
+                                            lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
+                                            lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge into inner contour`);
+                                            lastX = pt.x;
+                                            lastY = pt.y;
+                                            first = false;
+                                            continue;
+                                        }
+                                        lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
+                                        lastX = pt.x;
+                                        lastY = pt.y;
+                                    }
+                                    lines.push(`G0 Z5.0 ; Retract after inner pass`);
+                                    lines.push('');
+                                }
+                            }
+                        } else {
+                            for (let p = 1; p <= passes; p++) {
+                                const zDepth = -(depth * p);
+                                lines.push(`; --- Pass ${p}/${passes} ---`);
+                                let first = true;
+                                let lastX = 0, lastY = 0;
+
+                                for (let i = 0; i < pathPts.length; i++) {
+                                    const pt = pathPts[i];
+                                    if (first) {
+                                        lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
+                                        lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge`);
+                                        lastX = pt.x;
+                                        lastY = pt.y;
+                                        first = false;
+                                        continue;
+                                    }
+                                    lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
+                                    lastX = pt.x;
+                                    lastY = pt.y;
+                                }
+                                lines.push(`G0 Z5.0 ; Retract`);
+                                lines.push('');
+                            }
+                        }
+                    }
+
+                    lines.push('; --- End ---');
+                    lines.push('G0 X0 Y0');
+                    lines.push('M30');
+                }
+
+                return lines.join('\n');
+            }
+
+            // ===== Update preview (с учётом чекбокса визуализации) =====
+            function updatePreview(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave = 0.25, contourSide = 'outer') {
+                const rect = canvas.getBoundingClientRect();
+                const W = rect.width;
+                const H = rect.height;
+
+                // Очищаем canvas
+                ctx.clearRect(0, 0, W, H);
+
+                // Если визуализация отключена — рисуем только сообщение и выходим
+                if (!renderToggle.checked) {
+                    ctx.fillStyle = 'rgba(180, 140, 100, 0.15)';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('⚡ Визуализация отключена', W / 2, H / 2);
+                    coordInfo.textContent = '⬤ визуализация выключена';
+                    return;
+                }
+
+                const t = (mode === 'frame') ? Math.min(thickness, Math.min(size, height) * 0.4) : 0;
+                const pts = generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, t, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+                if (pts.length < 2) {
+                    ctx.fillStyle = 'rgba(180, 140, 100, 0.2)';
+                    ctx.font = '14px sans-serif';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('Нет данных для отображения', W / 2, H / 2);
+                    return;
+                }
+
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                for (const p of pts) {
+                    if (p.x < minX) minX = p.x;
+                    if (p.x > maxX) maxX = p.x;
+                    if (p.y < minY) minY = p.y;
+                    if (p.y > maxY) maxY = p.y;
+                }
+                const rangeX = maxX - minX || 1;
+                const rangeY = maxY - minY || 1;
+                const margin = 0.12;
+                const scale = Math.min(
+                    (W * (1 - 2 * margin)) / rangeX,
+                    (H * (1 - 2 * margin)) / rangeY
+                );
+                const cx = (minX + maxX) / 2;
+                const cy = (minY + maxY) / 2;
+                const offX = W / 2 - cx * scale;
+                const offY = H / 2 + cy * scale;
+
+                function toScreen(px, py) {
+                    return [offX + px * scale, offY - py * scale];
+                }
+
+                // Grid
+                ctx.save();
+                ctx.strokeStyle = 'rgba(180, 140, 100, 0.15)';
+                ctx.lineWidth = 0.5;
+                const gs = 10;
+                for (let v = Math.floor(minX / gs) * gs; v <= maxX; v += gs) {
+                    const [sx] = toScreen(v, 0);
+                    ctx.beginPath();
+                    ctx.moveTo(sx, 0);
+                    ctx.lineTo(sx, H);
+                    ctx.stroke();
+                }
+                for (let v = Math.floor(minY / gs) * gs; v <= maxY; v += gs) {
+                    const [, sy] = toScreen(0, v);
+                    ctx.beginPath();
+                    ctx.moveTo(0, sy);
+                    ctx.lineTo(W, sy);
+                    ctx.stroke();
+                }
+                ctx.restore();
+
+                // Axes
+                ctx.save();
+                ctx.strokeStyle = 'rgba(180, 140, 100, 0.2)';
+                ctx.lineWidth = 1;
+                ctx.setLineDash([4, 6]);
+                const [ox, oy] = toScreen(0, 0);
+                ctx.beginPath();
+                ctx.moveTo(0, oy);
+                ctx.lineTo(W, oy);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.moveTo(ox, 0);
+                ctx.lineTo(ox, H);
+                ctx.stroke();
+                ctx.setLineDash([]);
+                ctx.restore();
+
+                // Draw path
+                if (pts.length > 1) {
+                    const len = pts.length;
+                    const halfLen = Math.floor(len / 2);
+                    const isFrame = (mode === 'frame');
+                    const isSpiral = (mode === 'spiral');
+                    const isPocket = (mode === 'pocket');
+
+                    const roughEnd = isPocket ? Math.floor(len * 0.85) : (isSpiral ? Math.floor(len * 0.7) : len);
+
+                    for (let i = 0; i < len - 1; i++) {
+                        let color;
+                        if (laserMode) {
+                            const r = Math.round(200 + 55 * (i / len));
+                            const g = Math.round(60 - 40 * (i / len));
+                            const b = Math.round(30 - 20 * (i / len));
+                            color = `rgb(${r},${g},${b})`;
+                        } else if (isPocket) {
+                            if (i < roughEnd) {
+                                const r = Math.round(150 - 60 * (i / roughEnd));
+                                const g = Math.round(80 + 100 * (i / roughEnd));
+                                const b = Math.round(180 + 60 * (1 - i / roughEnd));
+                                color = `rgb(${r},${g},${b})`;
+                            } else {
+                                color = '#e87474';
+                            }
+                        } else if (isSpiral && i < roughEnd) {
+                            const r = Math.round(50 + 100 * (i / roughEnd));
+                            const g = Math.round(180 + 70 * (1 - i / roughEnd));
+                            const b = Math.round(200 + 55 * (1 - i / roughEnd));
+                            color = `rgb(${r},${g},${b})`;
+                        } else {
+                            const isInner = (isFrame && i >= halfLen) || (mode === 'outline' && contourSide === 'inner');
+                            if (isInner) {
+                                const r = Math.round(220 - 60 * (i / len));
+                                const g = Math.round(80 - 40 * (i / len));
+                                const b = Math.round(80 - 40 * (i / len));
+                                color = `rgb(${r},${g},${b})`;
+                            } else {
+                                const r = Math.round(80 - 40 * (i / len));
+                                const g = Math.round(180 + 60 * (1 - i / len));
+                                const b = Math.round(80 - 40 * (i / len));
+                                color = `rgb(${r},${g},${b})`;
+                            }
+                        }
+
+                        ctx.beginPath();
+                        const [x1, y1] = toScreen(pts[i].x, pts[i].y);
+                        const [x2, y2] = toScreen(pts[i + 1].x, pts[i + 1].y);
+                        ctx.moveTo(x1, y1);
+                        ctx.lineTo(x2, y2);
+                        ctx.strokeStyle = color;
+                        ctx.lineWidth = laserMode ? 3.5 : (isPocket ? (i < roughEnd ? 2.2 : 3.5) : (isSpiral && i < roughEnd ? 2.2 : 2.8));
+                        ctx.shadowColor = color;
+                        ctx.shadowBlur = laserMode ? 8 : (isPocket ? (i < roughEnd ? 4 : 8) : (isSpiral && i < roughEnd ? 6 : 4));
+                        ctx.stroke();
+                        ctx.shadowBlur = 0;
+                    }
+
+                    const [sx, sy] = toScreen(pts[0].x, pts[0].y);
+                    ctx.beginPath();
+                    ctx.arc(sx, sy, 5, 0, 2 * Math.PI);
+                    ctx.fillStyle = laserMode ? '#ff6644' : (isPocket ? '#6ac96a' : (isSpiral ? '#66ccff' : '#7ab86a'));
+                    ctx.shadowColor = ctx.fillStyle;
+                    ctx.shadowBlur = 12;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = '#fef0da';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    const [ex, ey] = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y);
+                    ctx.beginPath();
+                    ctx.arc(ex, ey, 4, 0, 2 * Math.PI);
+                    ctx.fillStyle = laserMode ? '#ffaa44' : (isPocket ? '#e8c84a' : (isSpiral ? '#3399ff' : '#d48a5a'));
+                    ctx.shadowColor = ctx.fillStyle;
+                    ctx.shadowBlur = 10;
+                    ctx.fill();
+                    ctx.shadowBlur = 0;
+                    ctx.strokeStyle = '#fef0da';
+                    ctx.lineWidth = 1.5;
+                    ctx.stroke();
+
+                    if (laserMode) {
+                        if (mode === 'spiral') {
+                            legend.innerHTML = `
+                        <span class="item"><span class="color-dot laser"></span> 🔥 Лазерная спираль (S=${document.getElementById('laserPowerDisplay').textContent})</span>
+                        <span class="item"><span class="color-dot yellow"></span> ⬤ старт (центр) / ⬤ конец (край)</span>
+                        <span class="item">Шаг ${stepoverPercent}% • от центра → к краю</span>
+                        <span class="item"><span class="color-dot" style="background:#666;"></span> M5 при подъезде</span>
+                    `;
+                        } else if (mode === 'pocket') {
+                            legend.innerHTML = `
+                        <span class="item"><span class="color-dot laser"></span> 🔥 Лазерные контуры (S=${document.getElementById('laserPowerDisplay').textContent})</span>
+                        <span class="item"><span class="color-dot yellow"></span> ⬤ старт (край) / ⬤ конец (центр)</span>
+                        <span class="item">Шаг ${stepoverPercent}% • от края → к центру</span>
+                        <span class="item"><span class="color-dot" style="background:#666;"></span> M5 между контурами</span>
+                    `;
+                        } else if (mode === 'frame') {
+                            legend.innerHTML = `
+                        <span class="item"><span class="color-dot laser"></span> 🔥 Лазер (S=${document.getElementById('laserPowerDisplay').textContent})</span>
+                        <span class="item"><span class="color-dot yellow"></span> ⬤ старт / ⬤ конец</span>
+                        <span class="item"><span class="color-dot" style="background:#ff8844;"></span> M5 между контурами</span>
+                        <span class="item"><span class="color-dot" style="background:#666;"></span> M5 при подъезде</span>
+                    `;
+                        } else {
+                            legend.innerHTML = `
+                        <span class="item"><span class="color-dot laser"></span> 🔥 Лазер (S=${document.getElementById('laserPowerDisplay').textContent})</span>
+                        <span class="item"><span class="color-dot yellow"></span> ⬤ старт / ⬤ конец</span>
+                        <span class="item"><span class="color-dot" style="background:#666;"></span> M5 при подъезде</span>
+                    `;
+                        }
+                    } else if (isPocket) {
+                        legend.innerHTML = `
+                    <span class="item"><span class="color-dot pocket"></span> Черновые контуры (припуск ${stockToLeave}мм)</span>
+                    <span class="item"><span class="color-dot red"></span> Чистовой проход (точный размер)</span>
+                    <span class="item"><span class="color-dot yellow"></span> ⬤ старт (внешний) / ⬤ конец (центр)</span>
+                    <span class="item">Шаг ${stepoverPercent}% • от края → к центру</span>
                 `;
-            } else {
-                const drillOn = drillCheckbox.checked && mode === 'window';
-                if (drillOn) {
-                    legend.innerHTML = `
-                        <span class="item"><span class="color-dot red"></span> Окно (удаление)</span>
+                    } else if (isSpiral) {
+                        legend.innerHTML = `
+                    <span class="item"><span class="color-dot spiral"></span> 🌀 Черновая спираль (припуск ${stockToLeave}мм)</span>
+                    <span class="item"><span class="color-dot red"></span> Чистовой проход (точный размер)</span>
+                    <span class="item"><span class="color-dot yellow"></span> ⬤ старт (центр) / ⬤ конец</span>
+                    <span class="item">Шаг ${stepoverPercent}%</span>
+                `;
+                    } else {
+                        const drillOn = drillCheckbox.checked && (mode === 'spiral' || mode === 'pocket');
+                        if (drillOn) {
+                            legend.innerHTML = `
+                        <span class="item"><span class="color-dot red"></span> Заливка (удаление)</span>
                         <span class="item"><span class="color-dot yellow"></span> 🔧 Сверление вкл.</span>
                     `;
-                } else if (isFrame) {
-                    legend.innerHTML = `
+                        } else if (isFrame) {
+                            legend.innerHTML = `
                         <span class="item"><span class="color-dot green"></span> Внешний (материал остаётся)</span>
                         <span class="item"><span class="color-dot red"></span> Внутренний (материал удаляется)</span>
                         <span class="item"><span class="color-dot" style="background:#d4a84a;"></span> ↑ Подъём Z между контурами</span>
                     `;
-                } else if (isWindow) {
-                    legend.innerHTML = `
-                        <span class="item"><span class="color-dot red"></span> Окно (материал удаляется внутри)</span>
+                        } else if (mode === 'spiral' || mode === 'pocket') {
+                            legend.innerHTML = `
+                        <span class="item"><span class="color-dot red"></span> Заливка (материал удаляется внутри)</span>
                     `;
-                } else {
-                    legend.innerHTML = `
-                        <span class="item"><span class="color-dot green"></span> Контур (материал остаётся внутри)</span>
-                    `;
+                        } else {
+                            if (contourSide === 'inner') {
+                                legend.innerHTML = `
+                            <span class="item"><span class="color-dot red"></span> Внутренний контур (материал остаётся снаружи)</span>
+                        `;
+                            } else {
+                                legend.innerHTML = `
+                            <span class="item"><span class="color-dot green"></span> Внешний контур (материал остаётся внутри)</span>
+                        `;
+                            }
+                        }
+                    }
+
+                    coordInfo.textContent = `⬤ старт  •  ⬤ конец  •  ${pts.length} точек`;
                 }
+
+                ctx.save();
+                ctx.fillStyle = 'rgba(180, 140, 100, 0.4)';
+                ctx.font = '12px monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                let label = '';
+                if (shape === 'rectangle') label = `${size.toFixed(1)}×${height.toFixed(1)} мм`;
+                else if (shape === 'hexagon') label = `⬡ Шестигранник ${size.toFixed(1)} мм (опис.)`;
+                else label = `${size.toFixed(1)} мм`;
+
+                if (laserMode) {
+                    label += ' 🔥 LASER';
+                    if (mode === 'spiral') label += ' 🌀 спираль';
+                    else if (mode === 'pocket') label += ' 🔲 контуры';
+                    let rDisplay = (mode === 'frame') ? radiusOuter : radius;
+                    if (rDisplay > 0.1) label += `  R${rDisplay.toFixed(1)}`;
+                    if (mode === 'frame' && radiusInner > 0.1) label += `/Rвн${radiusInner.toFixed(1)}`;
+                    if (mode === 'frame') label += `  стенка ${t.toFixed(1)}`;
+                    if (mode === 'frame') label += '  [M5 между контурами]';
+                    label += '  [M5 при подъезде]';
+                } else {
+                    let rDisplay = (mode === 'frame') ? radiusOuter : radius;
+                    if (rDisplay > 0.1) label += `  Rвнеш ${rDisplay.toFixed(1)}`;
+                    if (mode === 'frame' && radiusInner > 0.1) label += `  Rвнутр ${radiusInner.toFixed(1)}`;
+                    if (mode === 'frame') label += `  стенка ${t.toFixed(1)}`;
+                    if (toolDiameter > 0) label += `  Dфрезы ${toolDiameter.toFixed(2)}`;
+                    if (mode === 'outline') {
+                        label += contourSide === 'inner' ? '  ▶ внутренний (вырез)' : '  ▶ внешний (столбик)';
+                    }
+                    else if (mode === 'spiral') {
+                        label += '  ▶ заливка (спираль)';
+                        label += ` 🌀 спираль + finish (припуск ${stockToLeave}мм)`;
+                        if (drillCheckbox.checked) label += ' 🔧 сверление';
+                    } else if (mode === 'pocket') {
+                        label += '  ▶ заливка (смещение)';
+                        label += ` 🔲 от края → центр (припуск ${stockToLeave}мм)`;
+                        if (drillCheckbox.checked) label += ' 🔧 сверление';
+                    } else if (mode === 'frame') label += '  ▶ рамка (↑ Z между контурами)';
+                }
+
+                const [lx, ly] = toScreen(minX + rangeX * 0.05, minY - rangeY * 0.04);
+                ctx.fillText(label, lx, ly);
+                ctx.restore();
             }
 
-            coordInfo.textContent = `⬤ старт  •  ⬤ конец  •  ${pts.length} точек`;
-        }
+            // ===== ОСНОВНАЯ ГЕНЕРАЦИЯ =====
+            function generate() {
+                if (isGenerating) return;
+                isGenerating = true;
+                generateBtn.disabled = true;
+                generateBtn.innerHTML = '<span class="spinner"></span> Генерация...';
 
-        // Info label
-        ctx.save();
-        ctx.fillStyle = 'rgba(180, 140, 100, 0.4)';
-        ctx.font = '12px monospace';
-        ctx.textAlign = 'left';
-        ctx.textBaseline = 'bottom';
-        let label = '';
-        if (shape === 'rectangle') label = `${size.toFixed(1)}×${height.toFixed(1)} мм`;
-        else label = `${size.toFixed(1)} мм`;
-        
-        if (laserMode) {
-            label += ' 🔥 LASER';
-            let rDisplay = (mode === 'frame') ? radiusOuter : radius;
-            if (rDisplay > 0.1) label += `  R${rDisplay.toFixed(1)}`;
-            if (mode === 'frame' && radiusInner > 0.1) label += `/Rвн${radiusInner.toFixed(1)}`;
-            if (mode === 'frame') label += `  стенка ${t.toFixed(1)}`;
-            if (mode === 'frame') label += '  [M5 между контурами]';
-            label += '  [M5 при подъезде]';
-        } else {
-            let rDisplay = (mode === 'frame') ? radiusOuter : radius;
-            if (rDisplay > 0.1) label += `  Rвнеш ${rDisplay.toFixed(1)}`;
-            if (mode === 'frame' && radiusInner > 0.1) label += `  Rвнутр ${radiusInner.toFixed(1)}`;
-            if (mode === 'frame') label += `  стенка ${t.toFixed(1)}`;
-            if (toolDiameter > 0) label += `  Dфрезы ${toolDiameter.toFixed(2)}`;
-            if (mode === 'outline') label += '  ▶ столбик';
-            else if (mode === 'window') {
-                label += '  ▶ отверстие';
-                if (drillCheckbox.checked) label += ' 🔧 сверление';
+                setTimeout(() => {
+                    try {
+                        const shape = currentShape;
+                        const mode = currentMode;
+                        const size = parseFloat(sizeSlider.value);
+                        let height = size;
+                        if (shape === 'rectangle') height = parseFloat(heightSlider.value);
+                        const radius = parseFloat(radiusSlider.value);
+                        const radiusOuter = parseFloat(radiusOuterSlider.value);
+                        const radiusInner = parseFloat(radiusInnerSlider.value);
+                        const thickness = parseFloat(thicknessSlider.value);
+                        const feed = parseInt(feedSlider.value);
+                        const depth = parseFloat(depthSlider.value);
+                        const passes = parseInt(passesSlider.value);
+                        const toolDiameter = parseFloat(toolSlider.value);
+                        const drillEnabled = drillCheckbox.checked;
+                        const laserMode = laserCheckbox.checked;
+                        const laserPower = parseInt(laserPowerSlider.value);
+                        const stepoverPercent = parseFloat(stepoverSlider.value);
+                        const spiralDepth = parseFloat(spiralDepthSlider.value);
+                        const stockToLeave = parseFloat(stockToLeaveSlider.value);
+                        const contourSide = (mode === 'outline') ? currentContourSide : 'outer';
+
+                        const gcode = generateGCode(shape, size, height, radius, radiusOuter, radiusInner, feed, depth, passes, mode, thickness, toolDiameter, drillEnabled, laserMode, laserPower, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+                        currentGcode = gcode;
+                        gcodeOutput.value = gcode;
+
+                        const lines = gcode.split('\n').filter(l => l.trim() !== '').length;
+                        lineCount.textContent = `${lines} строк`;
+
+                        const pts = generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+                        currentPath = pts;
+
+                        resizeCanvas();
+                        updatePreview(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+
+                        if (laserMode) {
+                            if (mode === 'spiral') {
+                                showToast(`🔥 Лазерная спираль: M5 при подъезде, M3 на резке (S=${laserPower})`);
+                            } else if (mode === 'pocket') {
+                                showToast(`🔥 Лазерные контуры: M5 между контурами, M3 на резке (S=${laserPower})`);
+                            } else if (mode === 'frame') {
+                                showToast(`🔥 Лазер: M5 при подъезде и между контурами (S=${laserPower})`);
+                            } else {
+                                showToast(`🔥 Лазер: M5 при подъезде, M3 только на резке (S=${laserPower})`);
+                            }
+                        } else if (mode === 'outline') {
+                            showToast(contourSide === 'inner'
+                                ? '🔽 Внутренний контур: фреза внутри, материал снаружи'
+                                : '🔼 Внешний контур: фреза снаружи, материал внутри');
+                        } else if (mode === 'pocket') {
+                            showToast(`🔲 Смещение (контуры): припуск ${stockToLeave}мм, шаг ${stepoverPercent}%`);
+                        } else if (mode === 'spiral') {
+                            showToast(`🌀 Спираль + finish (припуск ${stockToLeave}мм), шаг ${stepoverPercent}%`);
+                        } else if (drillEnabled && (mode === 'spiral' || mode === 'pocket')) {
+                            showToast('✅ G-code сгенерирован с центровым сверлением');
+                        } else if (mode === 'frame') {
+                            showToast('✅ Рамка: подъём Z между внешним и внутренним контуром');
+                        } else {
+                            showToast('✅ G-code сгенерирован');
+                        }
+                        firstGenerateDone = true;
+                    } catch (e) {
+                        console.error(e);
+                        showToast('⚠️ Ошибка генерации: ' + e.message);
+                    } finally {
+                        isGenerating = false;
+                        generateBtn.disabled = false;
+                        generateBtn.innerHTML = '🔥 Сгенерировать';
+                    }
+                }, 50);
             }
-            else if (mode === 'frame') label += '  ▶ рамка (↑ Z между контурами)';
-        }
 
-        const [lx, ly] = toScreen(minX + rangeX * 0.05, minY - rangeY * 0.04);
-        ctx.fillText(label, lx, ly);
-        ctx.restore();
-    }
+            // ===== Update visibility =====
+            function updateVisibility() {
+                const isLaser = laserCheckbox.checked;
+                const isFrame = (currentMode === 'frame');
+                const isSpiral = (currentMode === 'spiral');
+                const isPocket = (currentMode === 'pocket');
+                const isCircle = (currentShape === 'circle');
+                const isHex = (currentShape === 'hexagon');
 
-    // ===== Main generate =====
-    function generate() {
-        const shape = currentShape;
-        const mode = currentMode;
-        const size = parseFloat(sizeSlider.value);
-        let height = size;
-        if (shape === 'rectangle') height = parseFloat(heightSlider.value);
-        const radius = parseFloat(radiusSlider.value);
-        const radiusOuter = parseFloat(radiusOuterSlider.value);
-        const radiusInner = parseFloat(radiusInnerSlider.value);
-        const thickness = parseFloat(thicknessSlider.value);
-        const feed = parseInt(feedSlider.value);
-        const depth = parseFloat(depthSlider.value);
-        const passes = parseInt(passesSlider.value);
-        const toolDiameter = parseFloat(toolSlider.value);
-        const drillEnabled = drillCheckbox.checked;
-        const laserMode = laserCheckbox.checked;
-        const laserPower = parseInt(laserPowerSlider.value);
+                if (isCircle || isHex) {
+                    radiusSingleGroup.classList.add('hidden');
+                    radiusSplitGroup.classList.add('hidden');
+                    radiusHint.textContent = 'Скругление углов';
+                } else if (isFrame) {
+                    radiusSingleGroup.classList.add('hidden');
+                    radiusSplitGroup.classList.remove('hidden');
+                } else {
+                    radiusSingleGroup.classList.remove('hidden');
+                    radiusSplitGroup.classList.add('hidden');
+                }
 
-        const gcode = generateGCode(shape, size, height, radius, radiusOuter, radiusInner, feed, depth, passes, mode, thickness, toolDiameter, drillEnabled, laserMode, laserPower);
-        currentGcode = gcode;
-        gcodeOutput.value = gcode;
+                thicknessGroup.classList.toggle('hidden', !isFrame);
+                contourSideGroup.classList.toggle('hidden', !(currentMode === 'outline') || isLaser);
 
-        const lines = gcode.split('\n').filter(l => l.trim() !== '').length;
-        lineCount.textContent = `${lines} строк`;
+                const showSpiralParams = (isSpiral || isPocket);
+                spiralParams.classList.toggle('hidden', !showSpiralParams);
+                spiralDepthGroup.classList.toggle('hidden', !(isSpiral && !isLaser));
+                stockToLeaveGroup.classList.toggle('hidden', !(isSpiral || isPocket) || isLaser);
 
-        const pts = generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode);
-        currentPath = pts;
+                drillGroup.classList.toggle('hidden', !(isSpiral || isPocket) || isLaser);
+                if (isLaser) drillCheckbox.checked = false;
 
-        resizeCanvas();
-        updatePreview(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode);
+                laserPowerGroup.classList.toggle('hidden', !isLaser);
+                depthGroup.classList.toggle('hidden', isLaser);
+                passesGroup.classList.toggle('hidden', isLaser);
+                toolGroup.classList.toggle('hidden', isLaser);
 
-        if (laserMode) {
-            if (mode === 'frame') {
-                showToast(`🔥 Лазер: M5 при подъезде и между контурами (S=${laserPower})`);
-            } else {
-                showToast(`🔥 Лазер: M5 при подъезде, M3 только на резке (S=${laserPower})`);
+                // Обновление класса для отключения визуализации
+                if (renderToggle.checked) {
+                    previewCard.classList.remove('render-off');
+                } else {
+                    previewCard.classList.add('render-off');
+                }
+
+                if (isLaser) {
+                    if (isSpiral) {
+                        compatHint.textContent = '🔥 Лазерная спираль: M5 при подъезде, M3 на резке';
+                    } else if (isPocket) {
+                        compatHint.textContent = '🔥 Лазерные контуры: M5 между контурами, M3 на резке';
+                    } else {
+                        compatHint.textContent = '🔥 Лазер: M5 при подъезде, M3 только на резке';
+                    }
+                } else if (isPocket) {
+                    compatHint.textContent = '🔲 Смещение (контуры): от края → центру, припуск + чистовой';
+                } else if (isSpiral) {
+                    compatHint.textContent = '🌀 Спираль (черновая с припуском) + чистовой контур для точного размера';
+                } else {
+                    compatHint.textContent = '✅ Совместим с Candle, LaserGRBL и любым ПО для GRBL';
+                }
+
+                modeBtns.forEach(btn => {
+                    btn.classList.remove('laser-active', 'pocket-mode');
+                    if (isLaser && btn.classList.contains('active')) {
+                        btn.classList.add('laser-active');
+                    }
+                    if (isPocket && btn.classList.contains('active') && btn.dataset.mode === 'pocket') {
+                        btn.classList.add('pocket-mode');
+                    }
+                });
             }
-        } else if (drillEnabled && mode === 'window') {
-            showToast('✅ G-code сгенерирован с режимом сверления');
-        } else if (mode === 'frame') {
-            showToast('✅ Рамка: подъём Z между внешним и внутренним контуром');
-        } else {
-            showToast('✅ G-code сгенерирован');
-        }
-    }
 
-    // ===== Update visibility для лазера =====
-    function updateLaserVisibility() {
-        const isLaser = laserCheckbox.checked;
-        const isFrame = (currentMode === 'frame');
-        
-        laserPowerGroup.classList.toggle('hidden', !isLaser);
-        depthGroup.classList.toggle('hidden', isLaser);
-        passesGroup.classList.toggle('hidden', isLaser);
-        toolGroup.classList.toggle('hidden', isLaser);
-        
-        drillGroup.classList.toggle('hidden', isLaser || currentMode !== 'window');
-        if (isLaser) drillCheckbox.checked = false;
-        
-        thicknessGroup.classList.toggle('hidden', !isFrame);
-        
-        if (isLaser) {
-            compatHint.textContent = '🔥 Лазер: M5 при подъезде, M3 только на резке';
-        } else {
-            compatHint.textContent = '✅ Совместим с Candle, LaserGRBL и любым ПО для GRBL';
-        }
+            // ===== UI events =====
+            shapeBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    shapeBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentShape = this.dataset.shape;
+                    if (currentShape === 'rectangle') {
+                        heightGroup.classList.remove('hidden');
+                        sizeLabel.textContent = 'Ширина';
+                    } else if (currentShape === 'hexagon') {
+                        heightGroup.classList.add('hidden');
+                        sizeLabel.textContent = 'Диаметр (опис. окруж.)';
+                    } else if (currentShape === 'circle') {
+                        heightGroup.classList.add('hidden');
+                        sizeLabel.textContent = 'Диаметр';
+                    } else {
+                        heightGroup.classList.add('hidden');
+                        sizeLabel.textContent = 'Размер (сторона)';
+                    }
+                    updateVisibility();
+                });
+            });
 
-        modeBtns.forEach(btn => {
-            if (isLaser) {
-                btn.classList.add('laser-active');
-            } else {
-                btn.classList.remove('laser-active');
+            modeBtns.forEach(btn => {
+                btn.addEventListener('click', function () {
+                    modeBtns.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentMode = this.dataset.mode;
+                    const hints = {
+                        outline: 'Контур — выберите внешний (столбик) или внутренний (вырез)',
+                        frame: 'Рамка — внешний контур (материал остаётся) + внутренний (удаляется), с подъёмом Z между контурами',
+                        spiral: 'Заливка по спирали — заполняет ВСЮ площадь от центра к краю',
+                        pocket: 'Заливка концентрическими контурами — от края к центру (для гаек/болтов)'
+                    };
+                    modeHint.textContent = hints[currentMode] || '';
+                    updateVisibility();
+                });
+            });
+
+            [sideOuterBtn, sideInnerBtn].forEach(btn => {
+                btn.addEventListener('click', function () {
+                    sideOuterBtn.classList.remove('active');
+                    sideInnerBtn.classList.remove('active');
+                    this.classList.add('active');
+                    currentContourSide = this.dataset.side;
+                    if (currentContourSide === 'inner') {
+                        contourSideHint.textContent = 'Внутренний: фреза внутри, материал остаётся снаружи (вырез/отверстие по контуру)';
+                    } else {
+                        contourSideHint.textContent = 'Внешний: фреза снаружи, материал остаётся внутри (столбик)';
+                    }
+                });
+            });
+
+            laserCheckbox.addEventListener('change', function () {
+                updateVisibility();
+            });
+
+            // НОВЫЙ обработчик для чекбокса визуализации
+            renderToggle.addEventListener('change', function () {
+                updateVisibility();
+                // Перерисовываем превью с учётом нового состояния
+                if (currentPath.length > 0) {
+                    const shape = currentShape;
+                    const mode = currentMode;
+                    const size = parseFloat(sizeSlider.value);
+                    let height = size;
+                    if (shape === 'rectangle') height = parseFloat(heightSlider.value);
+                    const radius = parseFloat(radiusSlider.value);
+                    const radiusOuter = parseFloat(radiusOuterSlider.value);
+                    const radiusInner = parseFloat(radiusInnerSlider.value);
+                    const thickness = parseFloat(thicknessSlider.value);
+                    const toolDiameter = parseFloat(toolSlider.value);
+                    const laserMode = laserCheckbox.checked;
+                    const stepoverPercent = parseFloat(stepoverSlider.value);
+                    const spiralDepth = parseFloat(spiralDepthSlider.value);
+                    const stockToLeave = parseFloat(stockToLeaveSlider.value);
+                    const contourSide = (mode === 'outline') ? currentContourSide : 'outer';
+                    resizeCanvas();
+                    updatePreview(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+                    if (renderToggle.checked) {
+                        showToast('👁️ Визуализация включена');
+                    } else {
+                        showToast('⚡ Визуализация отключена для экономии ресурсов');
+                    }
+                } else {
+                    resizeCanvas();
+                    ctx.clearRect(0, 0, canvas.width, canvas.height);
+                    if (!renderToggle.checked) {
+                        ctx.fillStyle = 'rgba(180, 140, 100, 0.15)';
+                        ctx.font = '14px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('⚡ Визуализация отключена', canvas.width / 2, canvas.height / 2);
+                    } else {
+                        ctx.fillStyle = 'rgba(180, 140, 100, 0.2)';
+                        ctx.font = '14px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('Нажмите «Сгенерировать»', canvas.width / 2, canvas.height / 2);
+                    }
+                    coordInfo.textContent = renderToggle.checked ? '⬤ ожидание' : '⬤ визуализация выключена';
+                }
+            });
+
+            drillCheckbox.addEventListener('change', function () { });
+
+            // Привязка слайдеров
+            bindSliderAndInput(stepoverSlider, stepoverInput, stepoverDisplay, 10, 80, 1, 0);
+            bindSliderAndInput(spiralDepthSlider, spiralDepthInput, spiralDepthDisplay, 0.05, 3, 0.05, 2);
+            bindSliderAndInput(stockToLeaveSlider, stockToLeaveInput, stockToLeaveDisplay, 0, 1, 0.05, 2);
+
+            generateBtn.addEventListener('click', generate);
+
+            copyBtn.addEventListener('click', function () {
+                if (!currentGcode) {showToast('⚠️ Сначала сгенерируйте'); return;}
+                navigator.clipboard.writeText(currentGcode).then(() => {
+                    showToast('📋 G-code скопирован!');
+                }).catch(() => {
+                    gcodeOutput.select();
+                    document.execCommand('copy');
+                    showToast('📋 G-code скопирован!');
+                });
+            });
+
+            downloadBtn.addEventListener('click', function () {
+                if (!currentGcode) {
+                    showToast('⚠️ Сначала сгенерируйте G-code');
+                    return;
+                }
+                const blob = new Blob([currentGcode], {type: 'text/plain;charset=utf-8'});
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                const shapeName = currentShape === 'rectangle' ? 'rect' : currentShape;
+                const modeName = currentMode === 'outline' ? 'contour' : (currentMode === 'pocket' ? 'pocket' : currentMode);
+                let suffix = '';
+                if (laserCheckbox.checked) suffix = '_laser';
+                else if (currentMode === 'pocket') suffix = '_pocket';
+                else if (currentMode === 'spiral') suffix = '_spiral_fill';
+                else if (drillCheckbox.checked && (currentMode === 'spiral' || currentMode === 'pocket')) suffix = '_drill';
+                else if (currentMode === 'outline' && currentContourSide === 'inner') suffix = '_inner';
+                a.download = `cnc_${shapeName}_${modeName}${suffix}.nc`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast('📥 Файл .nc скачан!');
+            });
+
+            cutviewerBtn.addEventListener('click', function () {
+                if (!currentGcode) {
+                    showToast('⚠️ Сначала сгенерируйте G-code');
+                    return;
+                }
+                navigator.clipboard.writeText(currentGcode).then(() => {
+                    window.open('https://ncviewer.com/', '_blank');
+                    showToast('📋 G-code скопирован, вставьте в NC Viewer');
+                }).catch(() => {
+                    gcodeOutput.select();
+                    document.execCommand('copy');
+                    window.open('https://ncviewer.com/', '_blank');
+                    showToast('📋 G-code скопирован, вставьте в NC Viewer');
+                });
+            });
+
+            resetViewBtn.addEventListener('click', function () {
+                if (currentPath.length === 0) {
+                    showToast('⚠️ Сначала сгенерируйте G-code');
+                    return;
+                }
+                resizeCanvas();
+                const size = parseFloat(sizeSlider.value);
+                const height = currentShape === 'rectangle' ? parseFloat(heightSlider.value) : size;
+                const radius = parseFloat(radiusSlider.value);
+                const radiusOuter = parseFloat(radiusOuterSlider.value);
+                const radiusInner = parseFloat(radiusInnerSlider.value);
+                const thickness = parseFloat(thicknessSlider.value);
+                const toolDiameter = parseFloat(toolSlider.value);
+                const laserMode = laserCheckbox.checked;
+                const stepoverPercent = parseFloat(stepoverSlider.value);
+                const spiralDepth = parseFloat(spiralDepthSlider.value);
+                const stockToLeave = parseFloat(stockToLeaveSlider.value);
+                const contourSide = (currentMode === 'outline') ? currentContourSide : 'outer';
+                updatePreview(currentShape, size, height, radius, radiusOuter, radiusInner, currentMode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+                showToast('⟳ Вид сброшен');
+            });
+
+            // ===== Инициализация привязок =====
+            function initBindings() {
+                bindSliderAndInput(sizeSlider, sizeInput, sizeDisplay, 1, 300, 0.5, 1);
+                bindSliderAndInput(heightSlider, heightInput, heightDisplay, 1, 200, 0.5, 1);
+                bindSliderAndInput(radiusSlider, radiusInput, radiusDisplay, 0, 40, 0.5, 1);
+                bindSliderAndInput(radiusOuterSlider, radiusOuterInput, radiusOuterDisplay, 0, 40, 0.5, 1);
+                bindSliderAndInput(radiusInnerSlider, radiusInnerInput, radiusInnerDisplay, 0, 40, 0.5, 1);
+                bindSliderAndInput(thicknessSlider, thicknessInput, thicknessDisplay, 0.1, 299, 0.1, 1);
+                bindSliderAndInput(feedSlider, feedInput, feedDisplay, 100, 1800, 10, 0);
+                bindSliderAndInput(depthSlider, depthInput, depthDisplay, 0.05, 5, 0.01, 2);
+                bindSliderAndInput(passesSlider, passesInput, passesDisplay, 1, 100, 1, 0);
+                bindSliderAndInput(toolSlider, toolInput, toolDisplay, 0.1, 10, 0.025, 3);
+                bindSliderAndInput(laserPowerSlider, laserPowerInput, laserPowerDisplay, 0, 1000, 1, 0);
             }
-        });
-    }
 
-    // ===== Обновление видимости групп =====
-    function updateVisibility() {
-        const isFrame = (currentMode === 'frame');
-        const isCircle = (currentShape === 'circle');
-        
-        if (isCircle) {
-            radiusSingleGroup.classList.add('hidden');
-            radiusSplitGroup.classList.add('hidden');
-        } else if (isFrame) {
-            radiusSingleGroup.classList.add('hidden');
-            radiusSplitGroup.classList.remove('hidden');
-        } else {
-            radiusSingleGroup.classList.remove('hidden');
-            radiusSplitGroup.classList.add('hidden');
-        }
+            // ===== Resize =====
+            let resizeTimer;
+            window.addEventListener('resize', function () {
+                clearTimeout(resizeTimer);
+                resizeTimer = setTimeout(() => {
+                    resizeCanvas();
+                    if (currentPath.length > 0 && renderToggle.checked) {
+                        const size = parseFloat(sizeSlider.value);
+                        const height = currentShape === 'rectangle' ? parseFloat(heightSlider.value) : size;
+                        const radius = parseFloat(radiusSlider.value);
+                        const radiusOuter = parseFloat(radiusOuterSlider.value);
+                        const radiusInner = parseFloat(radiusInnerSlider.value);
+                        const thickness = parseFloat(thicknessSlider.value);
+                        const toolDiameter = parseFloat(toolSlider.value);
+                        const laserMode = laserCheckbox.checked;
+                        const stepoverPercent = parseFloat(stepoverSlider.value);
+                        const spiralDepth = parseFloat(spiralDepthSlider.value);
+                        const stockToLeave = parseFloat(stockToLeaveSlider.value);
+                        const contourSide = (currentMode === 'outline') ? currentContourSide : 'outer';
+                        updatePreview(currentShape, size, height, radius, radiusOuter, radiusInner, currentMode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave, contourSide);
+                    } else if (!renderToggle.checked) {
+                        ctx.clearRect(0, 0, canvas.width, canvas.height);
+                        ctx.fillStyle = 'rgba(180, 140, 100, 0.15)';
+                        ctx.font = '14px sans-serif';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('⚡ Визуализация отключена', canvas.width / 2, canvas.height / 2);
+                    }
+                }, 150);
+            });
 
-        updateLaserVisibility();
-    }
+            // ===== Init =====
+            function init() {
+                sizeDisplay.textContent = sizeSlider.value;
+                heightDisplay.textContent = heightSlider.value;
+                radiusDisplay.textContent = radiusSlider.value;
+                radiusOuterDisplay.textContent = radiusOuterSlider.value;
+                radiusInnerDisplay.textContent = radiusInnerSlider.value;
+                thicknessDisplay.textContent = thicknessSlider.value;
+                feedDisplay.textContent = feedSlider.value;
+                depthDisplay.textContent = parseFloat(depthSlider.value).toFixed(2);
+                passesDisplay.textContent = passesSlider.value;
+                toolDisplay.textContent = toolSlider.value;
+                laserPowerDisplay.textContent = laserPowerSlider.value;
+                stepoverDisplay.textContent = stepoverSlider.value;
+                spiralDepthDisplay.textContent = spiralDepthSlider.value;
+                stockToLeaveDisplay.textContent = stockToLeaveSlider.value;
 
-    // ===== UI events =====
-    shapeBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            shapeBtns.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            currentShape = this.dataset.shape;
-            if (currentShape === 'rectangle') {
-                heightGroup.classList.remove('hidden');
-                sizeLabel.textContent = 'Ширина';
-            } else if (currentShape === 'square') {
+                sizeInput.value = sizeSlider.value;
+                heightInput.value = heightSlider.value;
+                radiusInput.value = radiusSlider.value;
+                radiusOuterInput.value = radiusOuterSlider.value;
+                radiusInnerInput.value = radiusInnerSlider.value;
+                thicknessInput.value = thicknessSlider.value;
+                feedInput.value = feedSlider.value;
+                depthInput.value = depthSlider.value;
+                passesInput.value = passesSlider.value;
+                toolInput.value = toolSlider.value;
+                laserPowerInput.value = laserPowerSlider.value;
+                stepoverInput.value = stepoverSlider.value;
+                spiralDepthInput.value = spiralDepthSlider.value;
+                stockToLeaveInput.value = stockToLeaveSlider.value;
+
+                currentShape = 'square';
+                currentMode = 'outline';
+                document.querySelector('.shape-btn[data-shape="square"]').classList.add('active');
+                document.querySelector('.mode-btn[data-mode="outline"]').classList.add('active');
                 heightGroup.classList.add('hidden');
+                thicknessGroup.classList.add('hidden');
+                radiusSplitGroup.classList.add('hidden');
+                drillGroup.classList.add('hidden');
+                laserPowerGroup.classList.add('hidden');
+                spiralParams.classList.add('hidden');
+                spiralDepthGroup.classList.add('hidden');
+                stockToLeaveGroup.classList.add('hidden');
                 sizeLabel.textContent = 'Размер (сторона)';
-            } else {
-                heightGroup.classList.add('hidden');
-                sizeLabel.textContent = 'Диаметр';
+                modeHint.textContent = 'Контур — выберите внешний (столбик) или внутренний (вырез)';
+                currentContourSide = 'outer';
+                if (sideOuterBtn) sideOuterBtn.classList.add('active');
+                if (sideInnerBtn) sideInnerBtn.classList.remove('active');
+                if (contourSideHint) contourSideHint.textContent = 'Внешний: фреза снаружи, материал остаётся внутри (столбик)';
+
+                initBindings();
+                updateVisibility();
+                resizeCanvas();
+
+                ctx.fillStyle = 'rgba(180, 140, 100, 0.2)';
+                ctx.font = '16px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText('Нажмите «Сгенерировать»', canvas.width / (2 * window.devicePixelRatio), canvas.height / (2 * window.devicePixelRatio));
             }
-            updateVisibility();
-            generate();
-        });
-    });
 
-    modeBtns.forEach(btn => {
-        btn.addEventListener('click', function() {
-            modeBtns.forEach(b => b.classList.remove('active'));
-            this.classList.add('active');
-            currentMode = this.dataset.mode;
-            const hints = {
-                outline: 'Внешний контур — материал остаётся внутри (столбик)',
-                frame: 'Рамка — внешний контур (материал остаётся) + внутренний (удаляется), с подъёмом Z между контурами',
-                window: 'Окно — материал удаляется внутри (отверстие)'
-            };
-            modeHint.textContent = hints[currentMode] || '';
-            updateVisibility();
-            generate();
-        });
-    });
+            init();
 
-    laserCheckbox.addEventListener('change', function() {
-        updateVisibility();
-        generate();
-    });
-
-    drillCheckbox.addEventListener('change', function() {
-        generate();
-    });
-
-    cutviewerBtn.addEventListener('click', function() {
-        if (!currentGcode) {
-            showToast('⚠️ Сначала сгенерируйте G-code');
-            return;
-        }
-        navigator.clipboard.writeText(currentGcode).then(() => {
-            window.open('https://ncviewer.com/', '_blank');
-            showToast('📋 G-code скопирован, вставьте в NC Viewer');
-        }).catch(() => {
-            gcodeOutput.select();
-            document.execCommand('copy');
-            window.open('https://ncviewer.com/', '_blank');
-            showToast('📋 G-code скопирован, вставьте в NC Viewer');
-        });
-    });
-
-    // ===== Инициализация привязок =====
-    function initBindings() {
-        bindSliderAndInput(sizeSlider, sizeInput, sizeDisplay, 1, 300, 0.5, 1);
-        bindSliderAndInput(heightSlider, heightInput, heightDisplay, 1, 200, 0.5, 1);
-        bindSliderAndInput(radiusSlider, radiusInput, radiusDisplay, 0, 40, 0.5, 1);
-        bindSliderAndInput(radiusOuterSlider, radiusOuterInput, radiusOuterDisplay, 0, 40, 0.5, 1);
-        bindSliderAndInput(radiusInnerSlider, radiusInnerInput, radiusInnerDisplay, 0, 40, 0.5, 1);
-        bindSliderAndInput(thicknessSlider, thicknessInput, thicknessDisplay, 0.1, 299, 0.1, 1);
-        bindSliderAndInput(feedSlider, feedInput, feedDisplay, 100, 1800, 10, 0);
-        bindSliderAndInput(depthSlider, depthInput, depthDisplay, 0.05, 5, 0.01, 2);
-        bindSliderAndInput(passesSlider, passesInput, passesDisplay, 1, 100, 1, 0);
-        bindSliderAndInput(toolSlider, toolInput, toolDisplay, 0.1, 10, 0.025, 3);
-        bindSliderAndInput(laserPowerSlider, laserPowerInput, laserPowerDisplay, 0, 1000, 1, 0);
-    }
-
-    // ===== Общая функция изменений =====
-    function onSliderChange() {
-        generate();
-    }
-
-    sizeSlider.addEventListener('input', onSliderChange);
-    heightSlider.addEventListener('input', onSliderChange);
-    radiusSlider.addEventListener('input', onSliderChange);
-    radiusOuterSlider.addEventListener('input', onSliderChange);
-    radiusInnerSlider.addEventListener('input', onSliderChange);
-    thicknessSlider.addEventListener('input', onSliderChange);
-    feedSlider.addEventListener('input', onSliderChange);
-    depthSlider.addEventListener('input', onSliderChange);
-    passesSlider.addEventListener('input', onSliderChange);
-    toolSlider.addEventListener('input', onSliderChange);
-    laserPowerSlider.addEventListener('input', onSliderChange);
-
-    generateBtn.addEventListener('click', generate);
-    copyBtn.addEventListener('click', function() {
-        if (!currentGcode) { showToast('⚠️ Сначала сгенерируйте'); return; }
-        navigator.clipboard.writeText(currentGcode).then(() => {
-            showToast('📋 G-code скопирован!');
-        }).catch(() => {
-            gcodeOutput.select();
-            document.execCommand('copy');
-            showToast('📋 G-code скопирован!');
-        });
-    });
-    downloadBtn.addEventListener('click', function() {
-        if (!currentGcode) {
-            showToast('⚠️ Сначала сгенерируйте G-code');
-            return;
-        }
-        const blob = new Blob([currentGcode], { type: 'text/plain;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        const shapeName = currentShape === 'rectangle' ? 'rect' : currentShape;
-        const modeName = currentMode === 'outline' ? 'contour' : currentMode;
-        let suffix = '';
-        if (laserCheckbox.checked) suffix = '_laser';
-        else if (drillCheckbox.checked && currentMode === 'window') suffix = '_drill';
-        a.download = `cnc_${shapeName}_${modeName}${suffix}.nc`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-        showToast('📥 Файл .nc скачан!');
-    });
-
-    resetViewBtn.addEventListener('click', function() {
-        resizeCanvas();
-        const size = parseFloat(sizeSlider.value);
-        const height = currentShape === 'rectangle' ? parseFloat(heightSlider.value) : size;
-        const radius = parseFloat(radiusSlider.value);
-        const radiusOuter = parseFloat(radiusOuterSlider.value);
-        const radiusInner = parseFloat(radiusInnerSlider.value);
-        const thickness = parseFloat(thicknessSlider.value);
-        const toolDiameter = parseFloat(toolSlider.value);
-        const laserMode = laserCheckbox.checked;
-        updatePreview(currentShape, size, height, radius, radiusOuter, radiusInner, currentMode, thickness, toolDiameter, laserMode);
-        showToast('⟳ Вид сброшен');
-    });
-
-    let resizeTimer;
-    window.addEventListener('resize', function() {
-        clearTimeout(resizeTimer);
-        resizeTimer = setTimeout(() => {
-            resizeCanvas();
-            const size = parseFloat(sizeSlider.value);
-            const height = currentShape === 'rectangle' ? parseFloat(heightSlider.value) : size;
-            const radius = parseFloat(radiusSlider.value);
-            const radiusOuter = parseFloat(radiusOuterSlider.value);
-            const radiusInner = parseFloat(radiusInnerSlider.value);
-            const thickness = parseFloat(thicknessSlider.value);
-            const toolDiameter = parseFloat(toolSlider.value);
-            const laserMode = laserCheckbox.checked;
-            updatePreview(currentShape, size, height, radius, radiusOuter, radiusInner, currentMode, thickness, toolDiameter, laserMode);
-        }, 150);
-    });
-
-    // ===== Init =====
-    function init() {
-        sizeDisplay.textContent = sizeSlider.value;
-        heightDisplay.textContent = heightSlider.value;
-        radiusDisplay.textContent = radiusSlider.value;
-        radiusOuterDisplay.textContent = radiusOuterSlider.value;
-        radiusInnerDisplay.textContent = radiusInnerSlider.value;
-        thicknessDisplay.textContent = thicknessSlider.value;
-        feedDisplay.textContent = feedSlider.value;
-        depthDisplay.textContent = parseFloat(depthSlider.value).toFixed(2);
-        passesDisplay.textContent = passesSlider.value;
-        toolDisplay.textContent = toolSlider.value;
-        laserPowerDisplay.textContent = laserPowerSlider.value;
-
-        sizeInput.value = sizeSlider.value;
-        heightInput.value = heightSlider.value;
-        radiusInput.value = radiusSlider.value;
-        radiusOuterInput.value = radiusOuterSlider.value;
-        radiusInnerInput.value = radiusInnerSlider.value;
-        thicknessInput.value = thicknessSlider.value;
-        feedInput.value = feedSlider.value;
-        depthInput.value = depthSlider.value;
-        passesInput.value = passesSlider.value;
-        toolInput.value = toolSlider.value;
-        laserPowerInput.value = laserPowerSlider.value;
-
-        currentShape = 'square';
-        currentMode = 'outline';
-        document.querySelector('.shape-btn[data-shape="square"]').classList.add('active');
-        document.querySelector('.mode-btn[data-mode="outline"]').classList.add('active');
-        heightGroup.classList.add('hidden');
-        thicknessGroup.classList.add('hidden');
-        radiusSplitGroup.classList.add('hidden');
-        drillGroup.classList.add('hidden');
-        laserPowerGroup.classList.add('hidden');
-        sizeLabel.textContent = 'Размер (сторона)';
-        modeHint.textContent = 'Внешний контур — материал остаётся внутри (столбик)';
-
-        initBindings();
-        updateLaserVisibility();
-        resizeCanvas();
-        generate();
-    }
-
-    init();
-
-    setTimeout(() => {
-        resizeCanvas();
-        const size = parseFloat(sizeSlider.value);
-        const height = currentShape === 'rectangle' ? parseFloat(heightSlider.value) : size;
-        const radius = parseFloat(radiusSlider.value);
-        const radiusOuter = parseFloat(radiusOuterSlider.value);
-        const radiusInner = parseFloat(radiusInnerSlider.value);
-        const thickness = parseFloat(thicknessSlider.value);
-        const toolDiameter = parseFloat(toolSlider.value);
-        const laserMode = laserCheckbox.checked;
-        updatePreview(currentShape, size, height, radius, radiusOuter, radiusInner, currentMode, thickness, toolDiameter, laserMode);
-    }, 100);
-
-})();
-</script>
+        })();
+    </script>
 </body>
+
 </html>
