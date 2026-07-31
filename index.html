@@ -1350,7 +1350,7 @@
                 canvas.style.width = w + 'px';
                 canvas.style.height = h + 'px';
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                return { w, h };
+                return {w, h};
             }
 
             // ===== Toast =====
@@ -1514,7 +1514,7 @@
                 return spiralPts.concat(finishPts);
             }
 
-            // ===== Генерация КОНЦЕНТРИЧЕСКИХ КОНТУРОВ (от края к центру) =====
+
             // ===== Получение контура фигуры =====
             function getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolRadius, contourSide = 'outer') {
                 const halfW = size / 2;
@@ -1556,18 +1556,18 @@
                             const p1 = rawPts[i];
                             const p2 = rawPts[(i + 1) % n];
 
-                            const v1 = { x: p0.x - p1.x, y: p0.y - p1.y };
+                            const v1 = {x: p0.x - p1.x, y: p0.y - p1.y};
                             const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y) || 0.001;
-                            const v2 = { x: p2.x - p1.x, y: p2.y - p1.y };
+                            const v2 = {x: p2.x - p1.x, y: p2.y - p1.y};
                             const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y) || 0.001;
 
                             const d = Math.min(rr, len1 * 0.45, len2 * 0.45);
-                            const a1 = { x: p1.x + (v1.x / len1) * d, y: p1.y + (v1.y / len1) * d };
-                            const a2 = { x: p1.x + (v2.x / len2) * d, y: p1.y + (v2.y / len2) * d };
+                            const a1 = {x: p1.x + (v1.x / len1) * d, y: p1.y + (v1.y / len1) * d};
+                            const a2 = {x: p1.x + (v2.x / len2) * d, y: p1.y + (v2.y / len2) * d};
 
-                            pts.push({ x: a1.x, y: a1.y });
+                            pts.push({x: a1.x, y: a1.y});
 
-                            const center = { x: p1.x, y: p1.y };
+                            const center = {x: p1.x, y: p1.y};
                             const angle1 = Math.atan2(a1.y - center.y, a1.x - center.x);
                             const angle2 = Math.atan2(a2.y - center.y, a2.x - center.x);
                             let startA = angle1;
@@ -1591,20 +1591,19 @@
                     if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                         let pts = getHexPoints(R, 0, 0, rOuter);
                         if (toolRadius > 0) {
+                            // outline: outer→наружу (false), inner→внутрь (true)
+                            // spiral/window: всегда внутрь (true) — выборка внутри контура
                             const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                             pts = offsetPoints(pts, toolRadius, isOuterOff);
                         }
                         return pts;
                     } else if (mode === 'frame') {
-                        // Внешний контур: смещаем НАРУЖУ (материал остаётся внутри)
+                        // Внешний: наружу; внутренний: внутрь + reverse (не трогает спираль/контур)
                         let outer = getHexPoints(R, 0, 0, rOuter);
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
-
-                        // Внутренний контур: смещаем ВНУТРЬ и разворачиваем (материал удаляется внутри)
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true); // наружу (MAIN sign)
                         let innerR = Math.max(0, R - t);
                         let inner = getHexPoints(innerR, 0, 0, rInner);
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
-                        // Разворачиваем внутренний контур (против часовой стрелки → по часовой)
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false); // внутрь (MAIN sign)
                         inner.reverse();
                         return outer.concat(inner);
                     }
@@ -1616,31 +1615,30 @@
                     if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
-                            pts.push({ x: halfW * Math.cos(a), y: halfW * Math.sin(a) });
+                            pts.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
                         }
                         if (toolRadius > 0) {
+                            // spiral/window: внутрь (true); outline зависит от стороны
                             const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                             pts = offsetPoints(pts, toolRadius, isOuterOff);
                         }
                         return pts;
                     } else if (mode === 'frame') {
-                        // Внешний контур: смещаем НАРУЖУ
+                        // Только рамка: наружу / внутрь + reverse
                         let outer = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
-                            outer.push({ x: halfW * Math.cos(a), y: halfW * Math.sin(a) });
+                            outer.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
                         }
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
-
-                        // Внутренний контур: смещаем ВНУТРЬ и разворачиваем
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true); // наружу
                         let innerR = Math.max(0, halfW - t);
                         let inner = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
-                            inner.push({ x: innerR * Math.cos(a), y: innerR * Math.sin(a) });
+                            inner.push({x: innerR * Math.cos(a), y: innerR * Math.sin(a)});
                         }
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
-                        inner.reverse(); // Разворот для правильного направления фрезерования
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false); // внутрь
+                        inner.reverse();
                         return outer.concat(inner);
                     }
                 }
@@ -1652,43 +1650,43 @@
                     const hw = w / 2, hh = h / 2;
                     const rr = Math.min(rad, Math.min(hw, hh) * 0.9);
                     if (rr < 0.01) {
-                        pts.push({ x: -hw, y: -hh });
-                        pts.push({ x: hw, y: -hh });
-                        pts.push({ x: hw, y: hh });
-                        pts.push({ x: -hw, y: hh });
-                        pts.push({ x: -hw, y: -hh });
+                        pts.push({x: -hw, y: -hh});
+                        pts.push({x: hw, y: -hh});
+                        pts.push({x: hw, y: hh});
+                        pts.push({x: -hw, y: hh});
+                        pts.push({x: -hw, y: -hh});
                     } else {
-                        pts.push({ x: -hw + rr, y: -hh });
-                        pts.push({ x: hw - rr, y: -hh });
+                        pts.push({x: -hw + rr, y: -hh});
+                        pts.push({x: hw - rr, y: -hh});
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = hw - rr, cy2 = -hh + rr;
-                            pts.push({ x: cx2 + rr * Math.cos(a - Math.PI / 2), y: cy2 + rr * Math.sin(a - Math.PI / 2) });
+                            pts.push({x: cx2 + rr * Math.cos(a - Math.PI / 2), y: cy2 + rr * Math.sin(a - Math.PI / 2)});
                         }
-                        pts.push({ x: hw, y: -hh + rr });
-                        pts.push({ x: hw, y: hh - rr });
+                        pts.push({x: hw, y: -hh + rr});
+                        pts.push({x: hw, y: hh - rr});
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = hw - rr, cy2 = hh - rr;
-                            pts.push({ x: cx2 + rr * Math.cos(a), y: cy2 + rr * Math.sin(a) });
+                            pts.push({x: cx2 + rr * Math.cos(a), y: cy2 + rr * Math.sin(a)});
                         }
-                        pts.push({ x: hw - rr, y: hh });
-                        pts.push({ x: -hw + rr, y: hh });
+                        pts.push({x: hw - rr, y: hh});
+                        pts.push({x: -hw + rr, y: hh});
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = -hw + rr, cy2 = hh - rr;
-                            pts.push({ x: cx2 + rr * Math.cos(a + Math.PI / 2), y: cy2 + rr * Math.sin(a + Math.PI / 2) });
+                            pts.push({x: cx2 + rr * Math.cos(a + Math.PI / 2), y: cy2 + rr * Math.sin(a + Math.PI / 2)});
                         }
-                        pts.push({ x: -hw, y: hh - rr });
-                        pts.push({ x: -hw, y: -hh + rr });
+                        pts.push({x: -hw, y: hh - rr});
+                        pts.push({x: -hw, y: -hh + rr});
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = -hw + rr, cy2 = -hh + rr;
-                            pts.push({ x: cx2 + rr * Math.cos(a + Math.PI), y: cy2 + rr * Math.sin(a + Math.PI) });
+                            pts.push({x: cx2 + rr * Math.cos(a + Math.PI), y: cy2 + rr * Math.sin(a + Math.PI)});
                         }
-                        pts.push({ x: -hw + rr, y: -hh });
+                        pts.push({x: -hw + rr, y: -hh});
                     }
-                    const result = pts.map(p => ({ x: p.x + cx, y: p.y + cy }));
+                    const result = pts.map(p => ({x: p.x + cx, y: p.y + cy}));
                     if (reverse) result.reverse();
                     return result;
                 }
@@ -1696,21 +1694,20 @@
                 if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                     let pts = addRoundedRect(0, 0, size, height, rOuter, false);
                     if (toolRadius > 0) {
+                        // spiral/window: внутрь (true); outline зависит от стороны
                         const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                         pts = offsetPoints(pts, toolRadius, isOuterOff);
                     }
                     return pts;
                 } else if (mode === 'frame') {
-                    // Внешний контур: смещаем НАРУЖУ (false = offset наружу)
+                    // Внешний НАРУЖУ, внутренний ВНУТРЬ + reverse — только для рамки
                     let outer = addRoundedRect(0, 0, size, height, rOuter, false);
-                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
-
-                    // Внутренний контур: смещаем ВНУТРЬ (true = offset внутрь) и разворачиваем
+                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true); // наружу (MAIN sign)
                     let innerW = Math.max(0.5, size - 2 * t);
                     let innerH = Math.max(0.5, height - 2 * t);
                     let inner = addRoundedRect(0, 0, innerW, innerH, rInner, false);
-                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
-                    inner.reverse(); // Разворот для правильного направления (по часовой стрелке)
+                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false); // внутрь (MAIN sign)
+                    inner.reverse();
                     return outer.concat(inner);
                 }
                 return [];
@@ -1745,9 +1742,7 @@
                     nx /= lenN;
                     ny /= lenN;
 
-                    // isOuter = true → внутрь (отрицательное смещение)
-                    // isOuter = false → наружу (положительное смещение)
-                    const sign = isOuter ? -1 : 1;
+                    const sign = isOuter ? 1 : -1;
                     result.push({
                         x: curr.x + sign * amount * nx,
                         y: curr.y + sign * amount * ny
@@ -1788,7 +1783,7 @@
                 lines.push('; ============================================');
                 lines.push(`; G-code generated for ${laserMode ? 'LASER (LaserGRBL)' : 'CNC 3018 (GRBL)'}`);
                 lines.push('; Compatible with: Candle, LaserGRBL, Universal G-code Sender');
-                const modeNames = { outline: 'Contour', frame: 'Frame', spiral: 'Spiral (Filling)' };
+                const modeNames = {outline: 'Contour', frame: 'Frame', spiral: 'Spiral (Filling)'};
                 lines.push(`; Mode: ${modeNames[mode] || mode}`);
                 if (mode === 'outline') {
                     lines.push(`; Contour side: ${contourSide === 'inner' ? 'INNER (material remains outside)' : 'OUTER (material remains inside)'}`);
@@ -2156,7 +2151,6 @@
                     const halfLen = Math.floor(len / 2);
                     const isFrame = (mode === 'frame');
                     const isSpiral = (mode === 'spiral');
-
                     const roughEnd = isSpiral ? Math.floor(len * 0.7) : len;
 
                     for (let i = 0; i < len - 1; i++) {
@@ -2261,8 +2255,8 @@
                     `;
                         } else if (isFrame) {
                             legend.innerHTML = `
-                        <span class="item"><span class="color-dot green"></span> Внешний контур (смещён НАРУЖУ → размер сохраняется)</span>
-                        <span class="item"><span class="color-dot red"></span> Внутренний контур (смещён ВНУТРЬ + РАЗВЁРНУТ → правильное фрезерование)</span>
+                        <span class="item"><span class="color-dot green"></span> Внешний (материал остаётся)</span>
+                        <span class="item"><span class="color-dot red"></span> Внутренний (материал удаляется)</span>
                         <span class="item"><span class="color-dot" style="background:#d4a84a;"></span> ↑ Подъём Z между контурами</span>
                     `;
                         } else if (mode === 'spiral') {
@@ -2317,9 +2311,7 @@
                         label += '  ▶ заливка (спираль)';
                         label += ` 🌀 спираль + finish (припуск ${stockToLeave}мм)`;
                         if (drillCheckbox.checked) label += ' 🔧 сверление';
-                    } else if (mode === 'frame') {
-                        label += '  ▶ РАМКА: внешний НАРУЖУ / внутренний ВНУТРЬ+РАЗВЁРНУТ (↑ Z между)';
-                    }
+                    } else if (mode === 'frame') label += '  ▶ рамка (↑ Z между контурами)';
                 }
 
                 const [lx, ly] = toScreen(minX + rangeX * 0.05, minY - rangeY * 0.04);
@@ -2387,7 +2379,7 @@
                         } else if (drillEnabled && mode === 'spiral') {
                             showToast('✅ G-code сгенерирован с центровым сверлением');
                         } else if (mode === 'frame') {
-                            showToast('✅ Рамка: внешний контур смещён НАРУЖУ, внутренний ВНУТРЬ+РАЗВЁРНУТ');
+                            showToast('✅ Рамка: внешний НАРУЖУ, внутренний ВНУТРЬ+РАЗВЁРНУТ');
                         } else {
                             showToast('✅ G-code сгенерирован');
                         }
@@ -2454,8 +2446,6 @@
                     }
                 } else if (isSpiral) {
                     compatHint.textContent = '🌀 Спираль (черновая с припуском) + чистовой контур для точного размера';
-                } else if (isFrame) {
-                    compatHint.textContent = '🖼️ Рамка: внешний НАРУЖУ / внутренний ВНУТРЬ+РАЗВЁРНУТ';
                 } else {
                     compatHint.textContent = '✅ Совместим с Candle, LaserGRBL и любым ПО для GRBL';
                 }
@@ -2502,7 +2492,7 @@
                     currentMode = this.dataset.mode;
                     const hints = {
                         outline: 'Контур — выберите внешний (столбик) или внутренний (вырез)',
-                        frame: 'Рамка — внешний контур (смещён НАРУЖУ) + внутренний (смещён ВНУТРЬ и РАЗВЁРНУТ), с подъёмом Z между контурами',
+                        frame: 'Рамка — внешний НАРУЖУ + внутренний ВНУТРЬ и РАЗВЁРНУТ, подъём Z между контурами',
                         spiral: 'Заливка по спирали — заполняет ВСЮ площадь от центра к краю'
                     };
                     modeHint.textContent = hints[currentMode] || '';
@@ -2585,7 +2575,7 @@
             generateBtn.addEventListener('click', generate);
 
             copyBtn.addEventListener('click', function () {
-                if (!currentGcode) { showToast('⚠️ Сначала сгенерируйте'); return; }
+                if (!currentGcode) {showToast('⚠️ Сначала сгенерируйте'); return;}
                 navigator.clipboard.writeText(currentGcode).then(() => {
                     showToast('📋 G-code скопирован!');
                 }).catch(() => {
@@ -2600,7 +2590,7 @@
                     showToast('⚠️ Сначала сгенерируйте G-code');
                     return;
                 }
-                const blob = new Blob([currentGcode], { type: 'text/plain;charset=utf-8' });
+                const blob = new Blob([currentGcode], {type: 'text/plain;charset=utf-8'});
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
@@ -2609,7 +2599,7 @@
                 let suffix = '';
                 if (laserCheckbox.checked) suffix = '_laser';
                 else if (currentMode === 'spiral') suffix = '_spiral_fill';
-                else if (drillCheckbox.checked && currentMode === 'spiral') suffix = '_drill';
+                else if (drillCheckbox.checked && (currentMode === 'spiral')) suffix = '_drill';
                 else if (currentMode === 'outline' && currentContourSide === 'inner') suffix = '_inner';
                 a.download = `cnc_${shapeName}_${modeName}${suffix}.nc`;
                 document.body.appendChild(a);
