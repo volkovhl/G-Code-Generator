@@ -7,7 +7,7 @@
     <meta name="description"
         content="G-code Generator для CNC 3018 — с учётом диаметра фрезы и режимом сверления для окон.">
     <meta name="author" content="Pavel Volkov / volkovhl.github.io">
-    <title>G-code Generator CNC 3018 + спираль / концентрические контуры</title>
+    <title>G-code Generator CNC 3018 + спираль</title>
     <style>
         * {
             margin: 0;
@@ -311,13 +311,6 @@
             border-color: #dac294;
             background: #fef5e7;
             color: #5a3e28;
-        }
-
-        .mode-btn.pocket-mode.active {
-            border-color: #8e44ad;
-            background: #8e44ad;
-            color: #fef3e2;
-            box-shadow: 0 4px 14px rgba(142, 68, 173, 0.35);
         }
 
         .side-btn {
@@ -746,10 +739,6 @@
             background: #66ccff;
         }
 
-        .color-dot.pocket {
-            background: #9b59b6;
-        }
-
         .color-dot.disabled {
             background: #555;
         }
@@ -951,7 +940,7 @@
     <div class="container">
         <div class="header">
             <h1>⚙️ G-code Generator <small>CNC 3018 · GRBL</small></h1>
-            <span class="sub">Контур · Рамка · Заливка</span>
+            <span class="sub">Контур · Рамка · Спираль</span>
         </div>
 
         <div class="params-grid">
@@ -971,7 +960,6 @@
                     <button class="mode-btn active" data-mode="outline">📐 Контур</button>
                     <button class="mode-btn" data-mode="frame">🖼️ Рамка</button>
                     <button class="mode-btn" data-mode="spiral">🌀 Спираль (заливка)</button>
-                    <button class="mode-btn" data-mode="pocket">🔘 Смещение (контур)</button>
                 </div>
                 <div class="hint" id="modeHint">Контур — выберите внешний (столбик) или внутренний (вырез)</div>
             </div>
@@ -1020,6 +1008,8 @@
                     <input type="range" id="sizeSlider" min="1" max="300" value="50" step="0.5">
                     <input type="number" class="num-input" id="sizeInput" value="50" step="0.5" min="1" max="300">
                 </div>
+                <div class="hint hidden" id="hexSizeHint">🔩 Под ключ (грань–грань) S мм → введите <b>S × 1.1547</b>
+                    (опис. диаметр). Пример: ключ 10 → 11.55</div>
             </div>
 
             <div class="param-group hidden" id="heightGroup">
@@ -1305,6 +1295,7 @@
             const stockToLeaveDisplay = document.getElementById('stockToLeaveDisplay');
 
             const sizeLabel = document.getElementById('sizeLabel');
+            const hexSizeHint = document.getElementById('hexSizeHint');
             const radiusSingleGroup = document.getElementById('radiusSingleGroup');
             const radiusSplitGroup = document.getElementById('radiusSplitGroup');
             const heightGroup = document.getElementById('heightGroup');
@@ -1359,7 +1350,7 @@
                 canvas.style.width = w + 'px';
                 canvas.style.height = h + 'px';
                 ctx.scale(window.devicePixelRatio, window.devicePixelRatio);
-                return {w, h};
+                return { w, h };
             }
 
             // ===== Toast =====
@@ -1524,59 +1515,6 @@
             }
 
             // ===== Генерация КОНЦЕНТРИЧЕСКИХ КОНТУРОВ (от края к центру) =====
-            function generatePocketContours(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, stockToLeave = 0.25) {
-                const toolRadius = laserMode ? 0.05 : (toolDiameter / 2);
-                if (toolRadius < 0.01) return [];
-
-                const outer = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, 0);
-                if (outer.length < 2) return [];
-
-                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                for (const p of outer) {
-                    if (p.x < minX) minX = p.x;
-                    if (p.x > maxX) maxX = p.x;
-                    if (p.y < minY) minY = p.y;
-                    if (p.y > maxY) maxY = p.y;
-                }
-                const cx = (minX + maxX) / 2;
-                const cy = (minY + maxY) / 2;
-
-                let maxR = 0;
-                for (const p of outer) {
-                    const dx = p.x - cx;
-                    const dy = p.y - cy;
-                    const r = Math.sqrt(dx * dx + dy * dy);
-                    if (r > maxR) maxR = r;
-                }
-
-                const step = (stepoverPercent / 100) * (laserMode ? 0.15 : toolDiameter);
-                const startR = maxR - (laserMode ? 0.01 : toolRadius);
-                const endR = laserMode ? 0.01 : toolRadius * 0.6;
-
-                const result = [];
-                const stepsCount = Math.max(1, Math.ceil((startR - endR) / step));
-
-                for (let i = 0; i < stepsCount; i++) {
-                    const t = (i + 1) / stepsCount;
-                    const currentR = startR - t * (startR - endR);
-                    const pts = outer.map(p => {
-                        const dx = p.x - cx;
-                        const dy = p.y - cy;
-                        const r = Math.sqrt(dx * dx + dy * dy) || 1;
-                        const scale = Math.max(0.01, currentR / r);
-                        const stockScale = 1 - (stockToLeave / (currentR + 0.01));
-                        const finalScale = scale * Math.max(0.1, stockScale);
-                        return {x: cx + dx * finalScale, y: cy + dy * finalScale};
-                    });
-                    result.push(pts);
-                }
-
-                const finishPts = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, 0);
-                result.push(finishPts);
-
-                return result.flat();
-            }
-
             // ===== Получение контура фигуры =====
             function getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolRadius, contourSide = 'outer') {
                 const halfW = size / 2;
@@ -1618,18 +1556,18 @@
                             const p1 = rawPts[i];
                             const p2 = rawPts[(i + 1) % n];
 
-                            const v1 = {x: p0.x - p1.x, y: p0.y - p1.y};
+                            const v1 = { x: p0.x - p1.x, y: p0.y - p1.y };
                             const len1 = Math.sqrt(v1.x * v1.x + v1.y * v1.y) || 0.001;
-                            const v2 = {x: p2.x - p1.x, y: p2.y - p1.y};
+                            const v2 = { x: p2.x - p1.x, y: p2.y - p1.y };
                             const len2 = Math.sqrt(v2.x * v2.x + v2.y * v2.y) || 0.001;
 
                             const d = Math.min(rr, len1 * 0.45, len2 * 0.45);
-                            const a1 = {x: p1.x + (v1.x / len1) * d, y: p1.y + (v1.y / len1) * d};
-                            const a2 = {x: p1.x + (v2.x / len2) * d, y: p1.y + (v2.y / len2) * d};
+                            const a1 = { x: p1.x + (v1.x / len1) * d, y: p1.y + (v1.y / len1) * d };
+                            const a2 = { x: p1.x + (v2.x / len2) * d, y: p1.y + (v2.y / len2) * d };
 
-                            pts.push({x: a1.x, y: a1.y});
+                            pts.push({ x: a1.x, y: a1.y });
 
-                            const center = {x: p1.x, y: p1.y};
+                            const center = { x: p1.x, y: p1.y };
                             const angle1 = Math.atan2(a1.y - center.y, a1.x - center.x);
                             const angle2 = Math.atan2(a2.y - center.y, a2.x - center.x);
                             let startA = angle1;
@@ -1650,19 +1588,24 @@
                         return pts;
                     }
 
-                    if (mode === 'outline' || mode === 'window' || mode === 'spiral' || mode === 'pocket') {
+                    if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                         let pts = getHexPoints(R, 0, 0, rOuter);
                         if (toolRadius > 0) {
-                            const isOuterOff = (mode === 'outline') ? outlineIsOuter : false;
+                            const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                             pts = offsetPoints(pts, toolRadius, isOuterOff);
                         }
                         return pts;
                     } else if (mode === 'frame') {
+                        // Внешний контур: смещаем НАРУЖУ (материал остаётся внутри)
                         let outer = getHexPoints(R, 0, 0, rOuter);
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
+
+                        // Внутренний контур: смещаем ВНУТРЬ и разворачиваем (материал удаляется внутри)
                         let innerR = Math.max(0, R - t);
                         let inner = getHexPoints(innerR, 0, 0, rInner);
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
+                        // Разворачиваем внутренний контур (против часовой стрелки → по часовой)
+                        inner.reverse();
                         return outer.concat(inner);
                     }
                 }
@@ -1670,30 +1613,34 @@
                 if (shape === 'circle') {
                     const steps = 48;
                     let pts = [];
-                    if (mode === 'outline' || mode === 'window' || mode === 'spiral' || mode === 'pocket') {
+                    if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
-                            pts.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
+                            pts.push({ x: halfW * Math.cos(a), y: halfW * Math.sin(a) });
                         }
                         if (toolRadius > 0) {
-                            const isOuterOff = (mode === 'outline') ? outlineIsOuter : false;
+                            const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                             pts = offsetPoints(pts, toolRadius, isOuterOff);
                         }
                         return pts;
                     } else if (mode === 'frame') {
+                        // Внешний контур: смещаем НАРУЖУ
                         let outer = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
-                            outer.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
+                            outer.push({ x: halfW * Math.cos(a), y: halfW * Math.sin(a) });
                         }
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
+
+                        // Внутренний контур: смещаем ВНУТРЬ и разворачиваем
                         let innerR = Math.max(0, halfW - t);
                         let inner = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
-                            inner.push({x: innerR * Math.cos(a), y: innerR * Math.sin(a)});
+                            inner.push({ x: innerR * Math.cos(a), y: innerR * Math.sin(a) });
                         }
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
+                        inner.reverse(); // Разворот для правильного направления фрезерования
                         return outer.concat(inner);
                     }
                 }
@@ -1705,61 +1652,65 @@
                     const hw = w / 2, hh = h / 2;
                     const rr = Math.min(rad, Math.min(hw, hh) * 0.9);
                     if (rr < 0.01) {
-                        pts.push({x: -hw, y: -hh});
-                        pts.push({x: hw, y: -hh});
-                        pts.push({x: hw, y: hh});
-                        pts.push({x: -hw, y: hh});
-                        pts.push({x: -hw, y: -hh});
+                        pts.push({ x: -hw, y: -hh });
+                        pts.push({ x: hw, y: -hh });
+                        pts.push({ x: hw, y: hh });
+                        pts.push({ x: -hw, y: hh });
+                        pts.push({ x: -hw, y: -hh });
                     } else {
-                        pts.push({x: -hw + rr, y: -hh});
-                        pts.push({x: hw - rr, y: -hh});
+                        pts.push({ x: -hw + rr, y: -hh });
+                        pts.push({ x: hw - rr, y: -hh });
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = hw - rr, cy2 = -hh + rr;
-                            pts.push({x: cx2 + rr * Math.cos(a - Math.PI / 2), y: cy2 + rr * Math.sin(a - Math.PI / 2)});
+                            pts.push({ x: cx2 + rr * Math.cos(a - Math.PI / 2), y: cy2 + rr * Math.sin(a - Math.PI / 2) });
                         }
-                        pts.push({x: hw, y: -hh + rr});
-                        pts.push({x: hw, y: hh - rr});
+                        pts.push({ x: hw, y: -hh + rr });
+                        pts.push({ x: hw, y: hh - rr });
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = hw - rr, cy2 = hh - rr;
-                            pts.push({x: cx2 + rr * Math.cos(a), y: cy2 + rr * Math.sin(a)});
+                            pts.push({ x: cx2 + rr * Math.cos(a), y: cy2 + rr * Math.sin(a) });
                         }
-                        pts.push({x: hw - rr, y: hh});
-                        pts.push({x: -hw + rr, y: hh});
+                        pts.push({ x: hw - rr, y: hh });
+                        pts.push({ x: -hw + rr, y: hh });
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = -hw + rr, cy2 = hh - rr;
-                            pts.push({x: cx2 + rr * Math.cos(a + Math.PI / 2), y: cy2 + rr * Math.sin(a + Math.PI / 2)});
+                            pts.push({ x: cx2 + rr * Math.cos(a + Math.PI / 2), y: cy2 + rr * Math.sin(a + Math.PI / 2) });
                         }
-                        pts.push({x: -hw, y: hh - rr});
-                        pts.push({x: -hw, y: -hh + rr});
+                        pts.push({ x: -hw, y: hh - rr });
+                        pts.push({ x: -hw, y: -hh + rr });
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * Math.PI / 2;
                             const cx2 = -hw + rr, cy2 = -hh + rr;
-                            pts.push({x: cx2 + rr * Math.cos(a + Math.PI), y: cy2 + rr * Math.sin(a + Math.PI)});
+                            pts.push({ x: cx2 + rr * Math.cos(a + Math.PI), y: cy2 + rr * Math.sin(a + Math.PI) });
                         }
-                        pts.push({x: -hw + rr, y: -hh});
+                        pts.push({ x: -hw + rr, y: -hh });
                     }
-                    const result = pts.map(p => ({x: p.x + cx, y: p.y + cy}));
+                    const result = pts.map(p => ({ x: p.x + cx, y: p.y + cy }));
                     if (reverse) result.reverse();
                     return result;
                 }
 
-                if (mode === 'outline' || mode === 'window' || mode === 'spiral' || mode === 'pocket') {
+                if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                     let pts = addRoundedRect(0, 0, size, height, rOuter, false);
                     if (toolRadius > 0) {
-                        const isOuterOff = (mode === 'outline') ? outlineIsOuter : false;
+                        const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                         pts = offsetPoints(pts, toolRadius, isOuterOff);
                     }
                     return pts;
                 } else if (mode === 'frame') {
+                    // Внешний контур: смещаем НАРУЖУ (false = offset наружу)
                     let outer = addRoundedRect(0, 0, size, height, rOuter, false);
-                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true);
+                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
+
+                    // Внутренний контур: смещаем ВНУТРЬ (true = offset внутрь) и разворачиваем
                     let innerW = Math.max(0.5, size - 2 * t);
                     let innerH = Math.max(0.5, height - 2 * t);
-                    let inner = addRoundedRect(0, 0, innerW, innerH, rInner, true);
-                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false);
+                    let inner = addRoundedRect(0, 0, innerW, innerH, rInner, false);
+                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
+                    inner.reverse(); // Разворот для правильного направления (по часовой стрелке)
                     return outer.concat(inner);
                 }
                 return [];
@@ -1794,7 +1745,9 @@
                     nx /= lenN;
                     ny /= lenN;
 
-                    const sign = isOuter ? 1 : -1;
+                    // isOuter = true → внутрь (отрицательное смещение)
+                    // isOuter = false → наружу (положительное смещение)
+                    const sign = isOuter ? -1 : 1;
                     result.push({
                         x: curr.x + sign * amount * nx,
                         y: curr.y + sign * amount * ny
@@ -1807,8 +1760,6 @@
             function generatePath(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave = 0.25, contourSide = 'outer') {
                 if (mode === 'spiral') {
                     return generateContourSpiral(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave);
-                } else if (mode === 'pocket') {
-                    return generatePocketContours(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, stockToLeave);
                 }
                 return getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, laserMode ? 0 : toolDiameter / 2, contourSide);
             }
@@ -1837,7 +1788,7 @@
                 lines.push('; ============================================');
                 lines.push(`; G-code generated for ${laserMode ? 'LASER (LaserGRBL)' : 'CNC 3018 (GRBL)'}`);
                 lines.push('; Compatible with: Candle, LaserGRBL, Universal G-code Sender');
-                const modeNames = {outline: 'Contour', frame: 'Frame', spiral: 'Spiral (Filling)', pocket: 'Pocket (Offset)'};
+                const modeNames = { outline: 'Contour', frame: 'Frame', spiral: 'Spiral (Filling)' };
                 lines.push(`; Mode: ${modeNames[mode] || mode}`);
                 if (mode === 'outline') {
                     lines.push(`; Contour side: ${contourSide === 'inner' ? 'INNER (material remains outside)' : 'OUTER (material remains inside)'}`);
@@ -1852,8 +1803,6 @@
                     lines.push(`; ⚠️ Laser is OFF (M5) during positioning, ON (M3) only when cutting`);
                     if (mode === 'spiral') {
                         lines.push(`; 🌀 LASER SPIRAL FILLING: stepover ${stepoverPercent}%, from center to edge`);
-                    } else if (mode === 'pocket') {
-                        lines.push(`; 🔲 LASER CONCENTRIC POCKET: stepover ${stepoverPercent}%, from edge to center`);
                     }
                     if (rOuter > 0.1) lines.push(`; Corner radius: ${rOuter.toFixed(1)} mm`);
                     if (mode === 'frame' && rInner > 0.1 && Math.abs(rInner - rOuter) > 0.01) {
@@ -1870,17 +1819,13 @@
                     if (mode === 'frame') lines.push(`; Wall thickness: ${t.toFixed(1)} mm`);
                     lines.push(`; Feed: ${feed} mm/min`);
                     lines.push(`; Depth/pass: ${depth} mm, Passes: ${passes}`);
-                    if (drillEnabled && (mode === 'spiral' || mode === 'pocket')) {
+                    if (drillEnabled && mode === 'spiral') {
                         lines.push('; 🔧 CENTER DRILL ENABLED');
                     }
                     if (mode === 'spiral') {
                         lines.push(`; 🌀 SPIRAL MILLING (FILLING THE ENTIRE PLANE): stepover ${stepoverPercent}%, Z per pass ${spiralDepth}mm`);
                         lines.push(`; Stock to leave (припуск): ${stockToLeave.toFixed(2)} mm → finish pass removes it for exact size`);
                         lines.push(`; Spiral (roughing) from center → finish contour pass for precision`);
-                    }
-                    if (mode === 'pocket') {
-                        lines.push(`; 🔲 CONCENTRIC POCKET: stepover ${stepoverPercent}%, stock to leave ${stockToLeave.toFixed(2)} mm`);
-                        lines.push(`; Roughing from outer edge → center, then finish contour pass for exact size`);
                     }
                 }
                 lines.push('; ============================================');
@@ -1897,11 +1842,11 @@
                     lines.push('G0 X0 Y0');
                     lines.push('');
 
-                    if (mode === 'spiral' || mode === 'pocket') {
+                    if (mode === 'spiral') {
                         if (pathPts.length > 1) {
-                            lines.push(`; --- Laser ${mode === 'spiral' ? 'spiral' : 'pocket'} filling ---`);
+                            lines.push(`; --- Laser ${'spiral'} filling ---`);
                             lines.push(`G0 X${pathPts[0].x.toFixed(3)} Y${pathPts[0].y.toFixed(3)}`);
-                            lines.push(`M3 S${laserPower} ; Laser ON - start ${mode === 'spiral' ? 'spiral' : 'pocket'} filling`);
+                            lines.push(`M3 S${laserPower} ; Laser ON - start ${'spiral'} filling`);
                             for (let i = 1; i < pathPts.length; i++) {
                                 lines.push(`G1 X${pathPts[i].x.toFixed(3)} Y${pathPts[i].y.toFixed(3)} F${feed}`);
                             }
@@ -1954,7 +1899,7 @@
                     lines.push('G0 X0 Y0');
                     lines.push('');
 
-                    if (drillEnabled && (mode === 'spiral' || mode === 'pocket')) {
+                    if (drillEnabled && mode === 'spiral') {
                         let cx = 0, cy = 0;
                         if (pathPts.length > 0) {
                             let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
@@ -1975,28 +1920,22 @@
                         lines.push('');
                     }
 
-                    if (mode === 'spiral' || mode === 'pocket') {
-                        const isSpiral = (mode === 'spiral');
-                        lines.push(`; === ${isSpiral ? 'SPIRAL' : 'CONCENTRIC POCKET'} MILLING ===`);
-                        lines.push(`; ${isSpiral ? 'Roughing spiral stops with stock-to-leave' : 'Roughing from outer edge toward center with stock-to-leave'}, then exact finish contour`);
+                    if (mode === 'spiral') {
+                        lines.push(`; === SPIRAL MILLING ===`);
+                        lines.push(`; Roughing spiral with stock-to-leave, then exact finish contour`);
 
                         const totalDepth = depth * passes;
-                        const numLayers = Math.max(1, Math.ceil(totalDepth / (isSpiral ? spiralDepth : depth)));
+                        const numLayers = Math.max(1, Math.ceil(totalDepth / spiralDepth));
                         const layerDepth = totalDepth / numLayers;
 
-                        let fullPath;
-                        if (isSpiral) {
-                            fullPath = generateContourSpiral(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave);
-                        } else {
-                            fullPath = generatePocketContours(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, stockToLeave);
-                        }
+                        let fullPath = generateContourSpiral(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolDiameter, laserMode, stepoverPercent, spiralDepth, stockToLeave);
                         const finishPts = getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, 'window', thickness, toolRadius);
                         const roughPts = fullPath.slice(0, Math.max(0, fullPath.length - finishPts.length));
 
                         if (roughPts.length > 1) {
                             for (let layer = 1; layer <= numLayers; layer++) {
                                 const zDepth = -(layerDepth * layer);
-                                lines.push(`; --- ${isSpiral ? 'Spiral' : 'Pocket'} roughing layer ${layer}/${numLayers} - Z${zDepth.toFixed(3)} (stock ${stockToLeave.toFixed(2)}mm) ---`);
+                                lines.push(`; --- Spiral roughing layer ${layer}/${numLayers} - Z${zDepth.toFixed(3)} (stock ${stockToLeave.toFixed(2)}mm) ---`);
 
                                 lines.push(`G0 X${roughPts[0].x.toFixed(3)} Y${roughPts[0].y.toFixed(3)}`);
                                 lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge to layer depth`);
@@ -2021,7 +1960,7 @@
                             }
                         }
 
-                        lines.push(`; --- ${isSpiral ? 'Spiral' : 'Pocket'} milling + finish complete ---`);
+                        lines.push(`; --- Spiral milling + finish complete ---`);
                         lines.push('');
                     } else {
                         if (mode === 'frame') {
@@ -2032,7 +1971,7 @@
                             if (outerPts.length > 1) {
                                 for (let p = 1; p <= passes; p++) {
                                     const zDepth = -(depth * p);
-                                    lines.push(`; --- Outer contour - Pass ${p}/${passes} ---`);
+                                    lines.push(`; --- Outer contour - Pass ${p}/${passes} (offset OUTWARD) ---`);
                                     let first = true;
                                     let lastX = 0, lastY = 0;
 
@@ -2062,7 +2001,7 @@
 
                                 for (let p = 1; p <= passes; p++) {
                                     const zDepth = -(depth * p);
-                                    lines.push(`; --- Inner contour - Pass ${p}/${passes} ---`);
+                                    lines.push(`; --- Inner contour - Pass ${p}/${passes} (offset INWARD, REVERSED) ---`);
                                     let first = true;
                                     let lastX = 0, lastY = 0;
 
@@ -2217,9 +2156,8 @@
                     const halfLen = Math.floor(len / 2);
                     const isFrame = (mode === 'frame');
                     const isSpiral = (mode === 'spiral');
-                    const isPocket = (mode === 'pocket');
 
-                    const roughEnd = isPocket ? Math.floor(len * 0.85) : (isSpiral ? Math.floor(len * 0.7) : len);
+                    const roughEnd = isSpiral ? Math.floor(len * 0.7) : len;
 
                     for (let i = 0; i < len - 1; i++) {
                         let color;
@@ -2228,15 +2166,6 @@
                             const g = Math.round(60 - 40 * (i / len));
                             const b = Math.round(30 - 20 * (i / len));
                             color = `rgb(${r},${g},${b})`;
-                        } else if (isPocket) {
-                            if (i < roughEnd) {
-                                const r = Math.round(150 - 60 * (i / roughEnd));
-                                const g = Math.round(80 + 100 * (i / roughEnd));
-                                const b = Math.round(180 + 60 * (1 - i / roughEnd));
-                                color = `rgb(${r},${g},${b})`;
-                            } else {
-                                color = '#e87474';
-                            }
                         } else if (isSpiral && i < roughEnd) {
                             const r = Math.round(50 + 100 * (i / roughEnd));
                             const g = Math.round(180 + 70 * (1 - i / roughEnd));
@@ -2263,9 +2192,9 @@
                         ctx.moveTo(x1, y1);
                         ctx.lineTo(x2, y2);
                         ctx.strokeStyle = color;
-                        ctx.lineWidth = laserMode ? 3.5 : (isPocket ? (i < roughEnd ? 2.2 : 3.5) : (isSpiral && i < roughEnd ? 2.2 : 2.8));
+                        ctx.lineWidth = laserMode ? 3.5 : (isSpiral && i < roughEnd ? 2.2 : 2.8);
                         ctx.shadowColor = color;
-                        ctx.shadowBlur = laserMode ? 8 : (isPocket ? (i < roughEnd ? 4 : 8) : (isSpiral && i < roughEnd ? 6 : 4));
+                        ctx.shadowBlur = laserMode ? 8 : (isSpiral && i < roughEnd ? 6 : 4);
                         ctx.stroke();
                         ctx.shadowBlur = 0;
                     }
@@ -2273,7 +2202,7 @@
                     const [sx, sy] = toScreen(pts[0].x, pts[0].y);
                     ctx.beginPath();
                     ctx.arc(sx, sy, 5, 0, 2 * Math.PI);
-                    ctx.fillStyle = laserMode ? '#ff6644' : (isPocket ? '#6ac96a' : (isSpiral ? '#66ccff' : '#7ab86a'));
+                    ctx.fillStyle = laserMode ? '#ff6644' : (isSpiral ? '#66ccff' : '#7ab86a');
                     ctx.shadowColor = ctx.fillStyle;
                     ctx.shadowBlur = 12;
                     ctx.fill();
@@ -2285,7 +2214,7 @@
                     const [ex, ey] = toScreen(pts[pts.length - 1].x, pts[pts.length - 1].y);
                     ctx.beginPath();
                     ctx.arc(ex, ey, 4, 0, 2 * Math.PI);
-                    ctx.fillStyle = laserMode ? '#ffaa44' : (isPocket ? '#e8c84a' : (isSpiral ? '#3399ff' : '#d48a5a'));
+                    ctx.fillStyle = laserMode ? '#ffaa44' : (isSpiral ? '#3399ff' : '#d48a5a');
                     ctx.shadowColor = ctx.fillStyle;
                     ctx.shadowBlur = 10;
                     ctx.fill();
@@ -2302,13 +2231,6 @@
                         <span class="item">Шаг ${stepoverPercent}% • от центра → к краю</span>
                         <span class="item"><span class="color-dot" style="background:#666;"></span> M5 при подъезде</span>
                     `;
-                        } else if (mode === 'pocket') {
-                            legend.innerHTML = `
-                        <span class="item"><span class="color-dot laser"></span> 🔥 Лазерные контуры (S=${document.getElementById('laserPowerDisplay').textContent})</span>
-                        <span class="item"><span class="color-dot yellow"></span> ⬤ старт (край) / ⬤ конец (центр)</span>
-                        <span class="item">Шаг ${stepoverPercent}% • от края → к центру</span>
-                        <span class="item"><span class="color-dot" style="background:#666;"></span> M5 между контурами</span>
-                    `;
                         } else if (mode === 'frame') {
                             legend.innerHTML = `
                         <span class="item"><span class="color-dot laser"></span> 🔥 Лазер (S=${document.getElementById('laserPowerDisplay').textContent})</span>
@@ -2323,13 +2245,6 @@
                         <span class="item"><span class="color-dot" style="background:#666;"></span> M5 при подъезде</span>
                     `;
                         }
-                    } else if (isPocket) {
-                        legend.innerHTML = `
-                    <span class="item"><span class="color-dot pocket"></span> Черновые контуры (припуск ${stockToLeave}мм)</span>
-                    <span class="item"><span class="color-dot red"></span> Чистовой проход (точный размер)</span>
-                    <span class="item"><span class="color-dot yellow"></span> ⬤ старт (внешний) / ⬤ конец (центр)</span>
-                    <span class="item">Шаг ${stepoverPercent}% • от края → к центру</span>
-                `;
                     } else if (isSpiral) {
                         legend.innerHTML = `
                     <span class="item"><span class="color-dot spiral"></span> 🌀 Черновая спираль (припуск ${stockToLeave}мм)</span>
@@ -2338,7 +2253,7 @@
                     <span class="item">Шаг ${stepoverPercent}%</span>
                 `;
                     } else {
-                        const drillOn = drillCheckbox.checked && (mode === 'spiral' || mode === 'pocket');
+                        const drillOn = drillCheckbox.checked && (mode === 'spiral');
                         if (drillOn) {
                             legend.innerHTML = `
                         <span class="item"><span class="color-dot red"></span> Заливка (удаление)</span>
@@ -2346,11 +2261,11 @@
                     `;
                         } else if (isFrame) {
                             legend.innerHTML = `
-                        <span class="item"><span class="color-dot green"></span> Внешний (материал остаётся)</span>
-                        <span class="item"><span class="color-dot red"></span> Внутренний (материал удаляется)</span>
+                        <span class="item"><span class="color-dot green"></span> Внешний контур (смещён НАРУЖУ → размер сохраняется)</span>
+                        <span class="item"><span class="color-dot red"></span> Внутренний контур (смещён ВНУТРЬ + РАЗВЁРНУТ → правильное фрезерование)</span>
                         <span class="item"><span class="color-dot" style="background:#d4a84a;"></span> ↑ Подъём Z между контурами</span>
                     `;
-                        } else if (mode === 'spiral' || mode === 'pocket') {
+                        } else if (mode === 'spiral') {
                             legend.innerHTML = `
                         <span class="item"><span class="color-dot red"></span> Заливка (материал удаляется внутри)</span>
                     `;
@@ -2383,7 +2298,6 @@
                 if (laserMode) {
                     label += ' 🔥 LASER';
                     if (mode === 'spiral') label += ' 🌀 спираль';
-                    else if (mode === 'pocket') label += ' 🔲 контуры';
                     let rDisplay = (mode === 'frame') ? radiusOuter : radius;
                     if (rDisplay > 0.1) label += `  R${rDisplay.toFixed(1)}`;
                     if (mode === 'frame' && radiusInner > 0.1) label += `/Rвн${radiusInner.toFixed(1)}`;
@@ -2403,11 +2317,9 @@
                         label += '  ▶ заливка (спираль)';
                         label += ` 🌀 спираль + finish (припуск ${stockToLeave}мм)`;
                         if (drillCheckbox.checked) label += ' 🔧 сверление';
-                    } else if (mode === 'pocket') {
-                        label += '  ▶ заливка (смещение)';
-                        label += ` 🔲 от края → центр (припуск ${stockToLeave}мм)`;
-                        if (drillCheckbox.checked) label += ' 🔧 сверление';
-                    } else if (mode === 'frame') label += '  ▶ рамка (↑ Z между контурами)';
+                    } else if (mode === 'frame') {
+                        label += '  ▶ РАМКА: внешний НАРУЖУ / внутренний ВНУТРЬ+РАЗВЁРНУТ (↑ Z между)';
+                    }
                 }
 
                 const [lx, ly] = toScreen(minX + rangeX * 0.05, minY - rangeY * 0.04);
@@ -2461,8 +2373,6 @@
                         if (laserMode) {
                             if (mode === 'spiral') {
                                 showToast(`🔥 Лазерная спираль: M5 при подъезде, M3 на резке (S=${laserPower})`);
-                            } else if (mode === 'pocket') {
-                                showToast(`🔥 Лазерные контуры: M5 между контурами, M3 на резке (S=${laserPower})`);
                             } else if (mode === 'frame') {
                                 showToast(`🔥 Лазер: M5 при подъезде и между контурами (S=${laserPower})`);
                             } else {
@@ -2472,14 +2382,12 @@
                             showToast(contourSide === 'inner'
                                 ? '🔽 Внутренний контур: фреза внутри, материал снаружи'
                                 : '🔼 Внешний контур: фреза снаружи, материал внутри');
-                        } else if (mode === 'pocket') {
-                            showToast(`🔲 Смещение (контуры): припуск ${stockToLeave}мм, шаг ${stepoverPercent}%`);
                         } else if (mode === 'spiral') {
                             showToast(`🌀 Спираль + finish (припуск ${stockToLeave}мм), шаг ${stepoverPercent}%`);
-                        } else if (drillEnabled && (mode === 'spiral' || mode === 'pocket')) {
+                        } else if (drillEnabled && mode === 'spiral') {
                             showToast('✅ G-code сгенерирован с центровым сверлением');
                         } else if (mode === 'frame') {
-                            showToast('✅ Рамка: подъём Z между внешним и внутренним контуром');
+                            showToast('✅ Рамка: внешний контур смещён НАРУЖУ, внутренний ВНУТРЬ+РАЗВЁРНУТ');
                         } else {
                             showToast('✅ G-code сгенерирован');
                         }
@@ -2500,7 +2408,6 @@
                 const isLaser = laserCheckbox.checked;
                 const isFrame = (currentMode === 'frame');
                 const isSpiral = (currentMode === 'spiral');
-                const isPocket = (currentMode === 'pocket');
                 const isCircle = (currentShape === 'circle');
                 const isHex = (currentShape === 'hexagon');
 
@@ -2519,12 +2426,12 @@
                 thicknessGroup.classList.toggle('hidden', !isFrame);
                 contourSideGroup.classList.toggle('hidden', !(currentMode === 'outline') || isLaser);
 
-                const showSpiralParams = (isSpiral || isPocket);
+                const showSpiralParams = isSpiral;
                 spiralParams.classList.toggle('hidden', !showSpiralParams);
                 spiralDepthGroup.classList.toggle('hidden', !(isSpiral && !isLaser));
-                stockToLeaveGroup.classList.toggle('hidden', !(isSpiral || isPocket) || isLaser);
+                stockToLeaveGroup.classList.toggle('hidden', !isSpiral || isLaser);
 
-                drillGroup.classList.toggle('hidden', !(isSpiral || isPocket) || isLaser);
+                drillGroup.classList.toggle('hidden', !isSpiral || isLaser);
                 if (isLaser) drillCheckbox.checked = false;
 
                 laserPowerGroup.classList.toggle('hidden', !isLaser);
@@ -2542,26 +2449,21 @@
                 if (isLaser) {
                     if (isSpiral) {
                         compatHint.textContent = '🔥 Лазерная спираль: M5 при подъезде, M3 на резке';
-                    } else if (isPocket) {
-                        compatHint.textContent = '🔥 Лазерные контуры: M5 между контурами, M3 на резке';
                     } else {
                         compatHint.textContent = '🔥 Лазер: M5 при подъезде, M3 только на резке';
                     }
-                } else if (isPocket) {
-                    compatHint.textContent = '🔲 Смещение (контуры): от края → центру, припуск + чистовой';
                 } else if (isSpiral) {
                     compatHint.textContent = '🌀 Спираль (черновая с припуском) + чистовой контур для точного размера';
+                } else if (isFrame) {
+                    compatHint.textContent = '🖼️ Рамка: внешний НАРУЖУ / внутренний ВНУТРЬ+РАЗВЁРНУТ';
                 } else {
                     compatHint.textContent = '✅ Совместим с Candle, LaserGRBL и любым ПО для GRBL';
                 }
 
                 modeBtns.forEach(btn => {
-                    btn.classList.remove('laser-active', 'pocket-mode');
+                    btn.classList.remove('laser-active');
                     if (isLaser && btn.classList.contains('active')) {
                         btn.classList.add('laser-active');
-                    }
-                    if (isPocket && btn.classList.contains('active') && btn.dataset.mode === 'pocket') {
-                        btn.classList.add('pocket-mode');
                     }
                 });
             }
@@ -2575,15 +2477,19 @@
                     if (currentShape === 'rectangle') {
                         heightGroup.classList.remove('hidden');
                         sizeLabel.textContent = 'Ширина';
+                        if (hexSizeHint) hexSizeHint.classList.add('hidden');
                     } else if (currentShape === 'hexagon') {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Диаметр (опис. окруж.)';
+                        if (hexSizeHint) hexSizeHint.classList.remove('hidden');
                     } else if (currentShape === 'circle') {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Диаметр';
+                        if (hexSizeHint) hexSizeHint.classList.add('hidden');
                     } else {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Размер (сторона)';
+                        if (hexSizeHint) hexSizeHint.classList.add('hidden');
                     }
                     updateVisibility();
                 });
@@ -2596,9 +2502,8 @@
                     currentMode = this.dataset.mode;
                     const hints = {
                         outline: 'Контур — выберите внешний (столбик) или внутренний (вырез)',
-                        frame: 'Рамка — внешний контур (материал остаётся) + внутренний (удаляется), с подъёмом Z между контурами',
-                        spiral: 'Заливка по спирали — заполняет ВСЮ площадь от центра к краю',
-                        pocket: 'Заливка концентрическими контурами — от края к центру (для гаек/болтов)'
+                        frame: 'Рамка — внешний контур (смещён НАРУЖУ) + внутренний (смещён ВНУТРЬ и РАЗВЁРНУТ), с подъёмом Z между контурами',
+                        spiral: 'Заливка по спирали — заполняет ВСЮ площадь от центра к краю'
                     };
                     modeHint.textContent = hints[currentMode] || '';
                     updateVisibility();
@@ -2680,7 +2585,7 @@
             generateBtn.addEventListener('click', generate);
 
             copyBtn.addEventListener('click', function () {
-                if (!currentGcode) {showToast('⚠️ Сначала сгенерируйте'); return;}
+                if (!currentGcode) { showToast('⚠️ Сначала сгенерируйте'); return; }
                 navigator.clipboard.writeText(currentGcode).then(() => {
                     showToast('📋 G-code скопирован!');
                 }).catch(() => {
@@ -2695,17 +2600,16 @@
                     showToast('⚠️ Сначала сгенерируйте G-code');
                     return;
                 }
-                const blob = new Blob([currentGcode], {type: 'text/plain;charset=utf-8'});
+                const blob = new Blob([currentGcode], { type: 'text/plain;charset=utf-8' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
                 const shapeName = currentShape === 'rectangle' ? 'rect' : currentShape;
-                const modeName = currentMode === 'outline' ? 'contour' : (currentMode === 'pocket' ? 'pocket' : currentMode);
+                const modeName = currentMode === 'outline' ? 'contour' : currentMode;
                 let suffix = '';
                 if (laserCheckbox.checked) suffix = '_laser';
-                else if (currentMode === 'pocket') suffix = '_pocket';
                 else if (currentMode === 'spiral') suffix = '_spiral_fill';
-                else if (drillCheckbox.checked && (currentMode === 'spiral' || currentMode === 'pocket')) suffix = '_drill';
+                else if (drillCheckbox.checked && currentMode === 'spiral') suffix = '_drill';
                 else if (currentMode === 'outline' && currentContourSide === 'inner') suffix = '_inner';
                 a.download = `cnc_${shapeName}_${modeName}${suffix}.nc`;
                 document.body.appendChild(a);
