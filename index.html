@@ -743,7 +743,6 @@
             background: #555;
         }
 
-        /* --- Новый стиль для чекбокса отключения визуализации --- */
         .render-toggle-group {
             display: flex;
             align-items: center;
@@ -964,7 +963,6 @@
                 <div class="hint" id="modeHint">Контур — выберите внешний (столбик) или внутренний (вырез)</div>
             </div>
 
-            <!-- Сторона контура (только режим Контур) -->
             <div class="param-group full" id="contourSideGroup">
                 <div class="param-label">Сторона фрезеровки</div>
                 <div class="mode-selector" id="contourSideSelector">
@@ -974,7 +972,6 @@
                 <div class="hint" id="contourSideHint">Внешний: фреза снаружи, материал остаётся внутри (столбик)</div>
             </div>
 
-            <!-- ЛАЗЕРНЫЙ РЕЖИМ -->
             <div class="param-group full">
                 <div class="checkbox-group">
                     <input type="checkbox" id="laserCheckbox">
@@ -1008,8 +1005,9 @@
                     <input type="range" id="sizeSlider" min="1" max="300" value="50" step="0.5">
                     <input type="number" class="num-input" id="sizeInput" value="50" step="0.5" min="1" max="300">
                 </div>
-                <div class="hint hidden" id="hexSizeHint">🔩 Под ключ (грань–грань) S мм → введите <b>S × 1.1547</b>
-                    (опис. диаметр). Пример: ключ 10 → 11.55</div>
+                <div class="hint" id="hexSizeHint">📐 Размер «под ключ» (S) — расстояние между параллельными гранями.
+                    Программа автоматически пересчитывает в диаметр описанной окружности (×1.1547). Пример: ключ 10 →
+                    опис. диам. 11.55</div>
             </div>
 
             <div class="param-group hidden" id="heightGroup">
@@ -1067,7 +1065,6 @@
                 <div class="hint" style="margin-top:4px;">Разные радиусы для внешнего и внутреннего контура рамки</div>
             </div>
 
-            <!-- Толщина стенки -->
             <div class="param-group hidden" id="thicknessGroup">
                 <div class="param-label">
                     Толщина стенки
@@ -1080,7 +1077,6 @@
                 <div class="hint">Только для режима «Рамка»</div>
             </div>
 
-            <!-- Параметры спирали и смещения -->
             <div class="param-group full hidden" id="spiralParams">
                 <div class="param-label">
                     <span>📐 Шаг (перекрытие)</span>
@@ -1120,7 +1116,6 @@
                 </div>
             </div>
 
-            <!-- Чекбокс сверления -->
             <div class="param-group full hidden" id="drillGroup">
                 <div class="checkbox-group">
                     <input type="checkbox" id="drillCheckbox">
@@ -1132,7 +1127,6 @@
                 <div class="hint">Добавляет центровое сверло перед началом фрезеровки</div>
             </div>
 
-            <!-- Подача -->
             <div class="param-group">
                 <div class="param-label">
                     Подача (F)
@@ -1144,7 +1138,6 @@
                 </div>
             </div>
 
-            <!-- Фрезерные параметры -->
             <div class="param-group" id="depthGroup">
                 <div class="param-label">
                     Глубина за проход
@@ -1179,7 +1172,6 @@
                 <div class="hint">Траектория смещается на радиус фрезы для точного размера</div>
             </div>
 
-            <!-- ===== НОВЫЙ ЧЕКБОКС ОТКЛЮЧЕНИЯ ВИЗУАЛИЗАЦИИ ===== -->
             <div class="param-group full" style="margin-top:2px;">
                 <div class="render-toggle-group">
                     <input type="checkbox" id="renderToggle" checked>
@@ -1263,7 +1255,6 @@
             const laserPowerSlider = document.getElementById('laserPowerSlider');
             const laserPowerInput = document.getElementById('laserPowerInput');
             const laserPowerDisplay = document.getElementById('laserPowerDisplay');
-            // НОВЫЙ чекбокс
             const renderToggle = document.getElementById('renderToggle');
 
             const sizeInput = document.getElementById('sizeInput');
@@ -1338,6 +1329,13 @@
             let isUpdating = false;
             let isGenerating = false;
             let firstGenerateDone = false;
+
+            // Константа для пересчёта шестигранника: S (под ключ) → R (описанная окружность)
+            const HEX_S_TO_R = 1.154700538; // 2 / sqrt(3)
+
+            function getHexCircumscribedDiameter(S) {
+                return S * HEX_S_TO_R;
+            }
 
             // ===== Canvas sizing =====
             function resizeCanvas() {
@@ -1517,14 +1515,20 @@
 
             // ===== Получение контура фигуры =====
             function getShapeContour(shape, size, height, radius, radiusOuter, radiusInner, mode, thickness, toolRadius, contourSide = 'outer') {
-                const halfW = size / 2;
+                // Для шестигранника: size — это размер "под ключ" (S), пересчитываем в описанную окружность
+                let actualSize = size;
+                if (shape === 'hexagon') {
+                    actualSize = getHexCircumscribedDiameter(size);
+                }
+
+                const halfW = actualSize / 2;
                 const halfH = height / 2;
 
                 let rOuter = 0, rInner = 0;
                 if (mode === 'frame') {
                     rOuter = Math.min(radiusOuter, Math.min(halfW, halfH) * 0.9);
                     const t = Math.min(thickness, Math.min(halfW, halfH) * 0.8);
-                    const innerW = Math.max(0.5, size - 2 * t);
+                    const innerW = Math.max(0.5, actualSize - 2 * t);
                     const innerH = Math.max(0.5, height - 2 * t);
                     rInner = Math.min(radiusInner, Math.min(innerW, innerH) * 0.9);
                 } else {
@@ -1591,19 +1595,16 @@
                     if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
                         let pts = getHexPoints(R, 0, 0, rOuter);
                         if (toolRadius > 0) {
-                            // outline: outer→наружу (false), inner→внутрь (true)
-                            // spiral/window: всегда внутрь (true) — выборка внутри контура
                             const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                             pts = offsetPoints(pts, toolRadius, isOuterOff);
                         }
                         return pts;
                     } else if (mode === 'frame') {
-                        // Внешний: наружу; внутренний: внутрь + reverse (не трогает спираль/контур)
                         let outer = getHexPoints(R, 0, 0, rOuter);
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false); // expand наружу
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
                         let innerR = Math.max(0, R - t);
                         let inner = getHexPoints(innerR, 0, 0, rInner);
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true); // shrink внутрь
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
                         inner.reverse();
                         return outer.concat(inner);
                     }
@@ -1618,26 +1619,24 @@
                             pts.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
                         }
                         if (toolRadius > 0) {
-                            // spiral/window: внутрь (true); outline зависит от стороны
                             const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                             pts = offsetPoints(pts, toolRadius, isOuterOff);
                         }
                         return pts;
                     } else if (mode === 'frame') {
-                        // Только рамка: наружу / внутрь + reverse
                         let outer = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
                             outer.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
                         }
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false); // expand наружу
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
                         let innerR = Math.max(0, halfW - t);
                         let inner = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
                             inner.push({x: innerR * Math.cos(a), y: innerR * Math.sin(a)});
                         }
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true); // shrink внутрь
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
                         inner.reverse();
                         return outer.concat(inner);
                     }
@@ -1692,21 +1691,19 @@
                 }
 
                 if (mode === 'outline' || mode === 'window' || mode === 'spiral') {
-                    let pts = addRoundedRect(0, 0, size, height, rOuter, false);
+                    let pts = addRoundedRect(0, 0, actualSize, height, rOuter, false);
                     if (toolRadius > 0) {
-                        // spiral/window: внутрь (true); outline зависит от стороны
                         const isOuterOff = (mode === 'outline') ? outlineIsOuter : true;
                         pts = offsetPoints(pts, toolRadius, isOuterOff);
                     }
                     return pts;
                 } else if (mode === 'frame') {
-                    // Внешний НАРУЖУ, внутренний ВНУТРЬ + reverse — только для рамки
-                    let outer = addRoundedRect(0, 0, size, height, rOuter, false);
-                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false); // expand наружу
-                    let innerW = Math.max(0.5, size - 2 * t);
+                    let outer = addRoundedRect(0, 0, actualSize, height, rOuter, false);
+                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false);
+                    let innerW = Math.max(0.5, actualSize - 2 * t);
                     let innerH = Math.max(0.5, height - 2 * t);
                     let inner = addRoundedRect(0, 0, innerW, innerH, rInner, false);
-                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true); // shrink внутрь
+                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true);
                     inner.reverse();
                     return outer.concat(inner);
                 }
@@ -1728,7 +1725,7 @@
 
                 const result = [];
                 const expanding = !isOuter;
-                const arcSegsPer90 = 16; // повышено для точности на Woodpecker
+                const arcSegsPer90 = 16;
 
                 for (let i = 0; i < n; i++) {
                     const prev = poly[(i - 1 + n) % n];
@@ -1814,14 +1811,21 @@
             function generateGCode(shape, size, height, radius, radiusOuter, radiusInner, feed, depth, passes, mode, thickness, toolDiameter, drillEnabled, laserMode, laserPower, stepoverPercent, spiralDepth, stockToLeave = 0.25, contourSide = 'outer') {
                 const lines = [];
                 const toolRadius = laserMode ? 0 : (toolDiameter / 2);
-                const halfW = size / 2;
+
+                // Для шестигранника: size — это S (под ключ), пересчитываем для вычислений
+                let actualSize = size;
+                if (shape === 'hexagon') {
+                    actualSize = getHexCircumscribedDiameter(size);
+                }
+
+                const halfW = actualSize / 2;
                 const halfH = height / 2;
                 const t = (mode === 'frame') ? Math.min(thickness, Math.min(halfW, halfH) * 0.8) : 0;
 
                 let rOuter, rInner;
                 if (mode === 'frame') {
                     rOuter = Math.min(radiusOuter, Math.min(halfW, halfH) * 0.9);
-                    const innerW = Math.max(0.5, size - 2 * t);
+                    const innerW = Math.max(0.5, actualSize - 2 * t);
                     const innerH = Math.max(0.5, height - 2 * t);
                     rInner = Math.min(radiusInner, Math.min(innerW, innerH) * 0.9);
                 } else {
@@ -1841,7 +1845,7 @@
                 }
                 let shapeName = shape.charAt(0).toUpperCase() + shape.slice(1);
                 if (shape === 'rectangle') shapeName += ` ${size}×${height}mm`;
-                else if (shape === 'hexagon') shapeName += ` (опис. окруж. ${size}mm)`;
+                else if (shape === 'hexagon') shapeName += ` (под ключ S=${size}mm, опис. диам. ${actualSize.toFixed(2)}mm)`;
                 else shapeName += ` ${size}mm`;
                 lines.push(`; Shape: ${shapeName}`);
                 if (laserMode) {
@@ -2110,10 +2114,8 @@
                 const W = rect.width;
                 const H = rect.height;
 
-                // Очищаем canvas
                 ctx.clearRect(0, 0, W, H);
 
-                // Если визуализация отключена — рисуем только сообщение и выходим
                 if (!renderToggle.checked) {
                     ctx.fillStyle = 'rgba(180, 140, 100, 0.15)';
                     ctx.font = '14px sans-serif';
@@ -2158,7 +2160,6 @@
                     return [offX + px * scale, offY - py * scale];
                 }
 
-                // Grid
                 ctx.save();
                 ctx.strokeStyle = 'rgba(180, 140, 100, 0.15)';
                 ctx.lineWidth = 0.5;
@@ -2179,7 +2180,6 @@
                 }
                 ctx.restore();
 
-                // Axes
                 ctx.save();
                 ctx.strokeStyle = 'rgba(180, 140, 100, 0.2)';
                 ctx.lineWidth = 1;
@@ -2196,7 +2196,6 @@
                 ctx.setLineDash([]);
                 ctx.restore();
 
-                // Draw path
                 if (pts.length > 1) {
                     const len = pts.length;
                     const halfLen = Math.floor(len / 2);
@@ -2337,7 +2336,7 @@
                 ctx.textBaseline = 'bottom';
                 let label = '';
                 if (shape === 'rectangle') label = `${size.toFixed(1)}×${height.toFixed(1)} мм`;
-                else if (shape === 'hexagon') label = `⬡ Шестигранник ${size.toFixed(1)} мм (опис.)`;
+                else if (shape === 'hexagon') label = `⬡ Шестигранник S=${size.toFixed(1)} мм (опис. ${getHexCircumscribedDiameter(size).toFixed(2)})`;
                 else label = `${size.toFixed(1)} мм`;
 
                 if (laserMode) {
@@ -2482,7 +2481,6 @@
                 passesGroup.classList.toggle('hidden', isLaser);
                 toolGroup.classList.toggle('hidden', isLaser);
 
-                // Обновление класса для отключения визуализации
                 if (renderToggle.checked) {
                     previewCard.classList.remove('render-off');
                 } else {
@@ -2518,19 +2516,21 @@
                     if (currentShape === 'rectangle') {
                         heightGroup.classList.remove('hidden');
                         sizeLabel.textContent = 'Ширина';
-                        if (hexSizeHint) hexSizeHint.classList.add('hidden');
+                        hexSizeHint.classList.remove('hidden');
+                        hexSizeHint.textContent = '📐 Ширина прямоугольника';
                     } else if (currentShape === 'hexagon') {
                         heightGroup.classList.add('hidden');
-                        sizeLabel.textContent = 'Диаметр (опис. окруж.)';
-                        if (hexSizeHint) hexSizeHint.classList.remove('hidden');
+                        sizeLabel.textContent = 'Размер «под ключ» (S)';
+                        hexSizeHint.classList.remove('hidden');
+                        hexSizeHint.textContent = '📐 Размер «под ключ» (S) — расстояние между параллельными гранями. Программа автоматически пересчитывает в диаметр описанной окружности (×1.1547). Пример: ключ 10 → опис. диам. 11.55';
                     } else if (currentShape === 'circle') {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Диаметр';
-                        if (hexSizeHint) hexSizeHint.classList.add('hidden');
+                        hexSizeHint.classList.add('hidden');
                     } else {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Размер (сторона)';
-                        if (hexSizeHint) hexSizeHint.classList.add('hidden');
+                        hexSizeHint.classList.add('hidden');
                     }
                     updateVisibility();
                 });
@@ -2569,10 +2569,8 @@
                 updateVisibility();
             });
 
-            // НОВЫЙ обработчик для чекбокса визуализации
             renderToggle.addEventListener('change', function () {
                 updateVisibility();
-                // Перерисовываем превью с учётом нового состояния
                 if (currentPath.length > 0) {
                     const shape = currentShape;
                     const mode = currentMode;
@@ -2618,7 +2616,6 @@
 
             drillCheckbox.addEventListener('change', function () { });
 
-            // Привязка слайдеров
             bindSliderAndInput(stepoverSlider, stepoverInput, stepoverDisplay, 10, 80, 1, 0);
             bindSliderAndInput(spiralDepthSlider, spiralDepthInput, spiralDepthDisplay, 0.05, 3, 0.05, 2);
             bindSliderAndInput(stockToLeaveSlider, stockToLeaveInput, stockToLeaveDisplay, 0, 1, 0.05, 2);
