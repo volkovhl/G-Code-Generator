@@ -1005,9 +1005,7 @@
                     <input type="range" id="sizeSlider" min="1" max="300" value="50" step="0.5">
                     <input type="number" class="num-input" id="sizeInput" value="50" step="0.1" min="1" max="300">
                 </div>
-                <div class="hint" id="hexSizeHint">📐 Размер «под ключ» (S) — расстояние между параллельными гранями.
-                    Программа автоматически пересчитывает в диаметр описанной окружности (×1.1547). Пример: ключ 10 →
-                    опис. диам. 11.55</div>
+
             </div>
 
             <div class="param-group hidden" id="heightGroup">
@@ -1286,7 +1284,6 @@
             const stockToLeaveDisplay = document.getElementById('stockToLeaveDisplay');
 
             const sizeLabel = document.getElementById('sizeLabel');
-            const hexSizeHint = document.getElementById('hexSizeHint');
             const radiusSingleGroup = document.getElementById('radiusSingleGroup');
             const radiusSplitGroup = document.getElementById('radiusSplitGroup');
             const heightGroup = document.getElementById('heightGroup');
@@ -2538,22 +2535,15 @@
 
                     if (currentShape === 'rectangle') {
                         heightGroup.classList.remove('hidden');
-                        sizeLabel.textContent = 'Ширина';
-                        hexSizeHint.classList.remove('hidden');
-                        hexSizeHint.textContent = '📐 Ширина прямоугольника';
                     } else if (currentShape === 'hexagon') {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Размер «под ключ» (S)';
-                        hexSizeHint.classList.remove('hidden');
-                        hexSizeHint.textContent = '📐 Размер «под ключ» (S) — расстояние между параллельными гранями. Программа автоматически пересчитывает в диаметр описанной окружности (×1.1547). Пример: ключ 10 → опис. диам. 11.55';
                     } else if (currentShape === 'circle') {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Диаметр';
-                        hexSizeHint.classList.add('hidden');
                     } else {
                         heightGroup.classList.add('hidden');
                         sizeLabel.textContent = 'Размер (сторона)';
-                        hexSizeHint.classList.add('hidden');
                     }
                     updateVisibility();
                 });
