@@ -1600,10 +1600,10 @@
                     } else if (mode === 'frame') {
                         // Внешний: наружу; внутренний: внутрь + reverse (не трогает спираль/контур)
                         let outer = getHexPoints(R, 0, 0, rOuter);
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true); // наружу (MAIN sign)
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false); // expand наружу
                         let innerR = Math.max(0, R - t);
                         let inner = getHexPoints(innerR, 0, 0, rInner);
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false); // внутрь (MAIN sign)
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true); // shrink внутрь
                         inner.reverse();
                         return outer.concat(inner);
                     }
@@ -1630,14 +1630,14 @@
                             const a = (i / steps) * 2 * Math.PI;
                             outer.push({x: halfW * Math.cos(a), y: halfW * Math.sin(a)});
                         }
-                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true); // наружу
+                        if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false); // expand наружу
                         let innerR = Math.max(0, halfW - t);
                         let inner = [];
                         for (let i = 0; i <= steps; i++) {
                             const a = (i / steps) * 2 * Math.PI;
                             inner.push({x: innerR * Math.cos(a), y: innerR * Math.sin(a)});
                         }
-                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false); // внутрь
+                        if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true); // shrink внутрь
                         inner.reverse();
                         return outer.concat(inner);
                     }
@@ -1702,51 +1702,102 @@
                 } else if (mode === 'frame') {
                     // Внешний НАРУЖУ, внутренний ВНУТРЬ + reverse — только для рамки
                     let outer = addRoundedRect(0, 0, size, height, rOuter, false);
-                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, true); // наружу (MAIN sign)
+                    if (toolRadius > 0) outer = offsetPoints(outer, toolRadius, false); // expand наружу
                     let innerW = Math.max(0.5, size - 2 * t);
                     let innerH = Math.max(0.5, height - 2 * t);
                     let inner = addRoundedRect(0, 0, innerW, innerH, rInner, false);
-                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, false); // внутрь (MAIN sign)
+                    if (toolRadius > 0) inner = offsetPoints(inner, toolRadius, true); // shrink внутрь
                     inner.reverse();
                     return outer.concat(inner);
                 }
                 return [];
             }
 
-            // ===== Смещение траектории =====
+            // ===== Смещение траектории (дуги на внешних углах + точный miter, 16 сегм./90°) =====
             function offsetPoints(pts, amount, isOuter) {
-                if (amount === 0 || pts.length < 2) return pts.slice();
+                if (amount < 0.001 || pts.length < 3) return pts.slice();
+
+                let poly = pts.slice();
+                if (poly.length > 1) {
+                    const dx = poly[0].x - poly[poly.length - 1].x;
+                    const dy = poly[0].y - poly[poly.length - 1].y;
+                    if (Math.hypot(dx, dy) < 1e-4) poly.pop();
+                }
+                const n = poly.length;
+                if (n < 3) return pts.slice();
+
                 const result = [];
-                const n = pts.length;
-                const p = pts.slice();
+                const expanding = !isOuter;
+                const arcSegsPer90 = 16; // повышено для точности на Woodpecker
+
                 for (let i = 0; i < n; i++) {
-                    const prev = p[(i - 1 + n) % n];
-                    const curr = p[i];
-                    const next = p[(i + 1) % n];
+                    const prev = poly[(i - 1 + n) % n];
+                    const curr = poly[i];
+                    const next = poly[(i + 1) % n];
 
                     const dx1 = curr.x - prev.x;
                     const dy1 = curr.y - prev.y;
-                    const len1 = Math.sqrt(dx1 * dx1 + dy1 * dy1) || 0.001;
-                    const nx1 = -dy1 / len1;
-                    const ny1 = dx1 / len1;
+                    const len1 = Math.hypot(dx1, dy1) || 1e-6;
+                    const ux1 = dx1 / len1, uy1 = dy1 / len1;
 
                     const dx2 = next.x - curr.x;
                     const dy2 = next.y - curr.y;
-                    const len2 = Math.sqrt(dx2 * dx2 + dy2 * dy2) || 0.001;
-                    const nx2 = -dy2 / len2;
-                    const ny2 = dx2 / len2;
+                    const len2 = Math.hypot(dx2, dy2) || 1e-6;
+                    const ux2 = dx2 / len2, uy2 = dy2 / len2;
 
-                    let nx = (nx1 + nx2) / 2;
-                    let ny = (ny1 + ny2) / 2;
-                    const lenN = Math.sqrt(nx * nx + ny * ny) || 0.001;
-                    nx /= lenN;
-                    ny /= lenN;
+                    const nx1 = -uy1, ny1 = ux1;
+                    const nx2 = -uy2, ny2 = ux2;
 
-                    const sign = isOuter ? 1 : -1;
-                    result.push({
-                        x: curr.x + sign * amount * nx,
-                        y: curr.y + sign * amount * ny
-                    });
+                    const cross = ux1 * uy2 - uy1 * ux2;
+                    const dot = ux1 * ux2 + uy1 * uy2;
+                    let turnAngle = Math.atan2(cross, dot);
+
+                    const isExternalCorner = expanding && turnAngle < -0.08;
+
+                    if (isExternalCorner) {
+                        const outNx1 = -nx1, outNy1 = -ny1;
+                        const outNx2 = -nx2, outNy2 = -ny2;
+
+                        const startA = Math.atan2(outNy1, outNx1);
+                        const endA = Math.atan2(outNy2, outNx2);
+
+                        let delta = endA - startA;
+                        while (delta > Math.PI) delta -= 2 * Math.PI;
+                        while (delta < -Math.PI) delta += 2 * Math.PI;
+                        if (delta > 0) delta -= 2 * Math.PI;
+
+                        const segs = Math.max(4, Math.round(arcSegsPer90 * Math.abs(delta) / (Math.PI / 2)));
+                        for (let s = 0; s <= segs; s++) {
+                            const a = startA + (s / segs) * delta;
+                            result.push({
+                                x: curr.x + amount * Math.cos(a),
+                                y: curr.y + amount * Math.sin(a)
+                            });
+                        }
+                    } else {
+                        const sign = isOuter ? 1 : -1;
+                        const sh1x = sign * amount * nx1, sh1y = sign * amount * ny1;
+                        const sh2x = sign * amount * nx2, sh2y = sign * amount * ny2;
+
+                        const p1 = {x: prev.x + sh1x, y: prev.y + sh1y};
+                        const p2 = {x: curr.x + sh2x, y: curr.y + sh2y};
+
+                        const det = ux1 * uy2 - uy1 * ux2;
+                        let ix, iy;
+                        if (Math.abs(det) > 1e-8) {
+                            const t = ((p2.x - p1.x) * uy2 - (p2.y - p1.y) * ux2) / det;
+                            ix = p1.x + t * ux1;
+                            iy = p1.y + t * uy1;
+                        } else {
+                            ix = (curr.x + sh1x + curr.x + sh2x) / 2;
+                            iy = (curr.y + sh1y + curr.y + sh2y) / 2;
+                        }
+                        result.push({x: ix, y: iy});
+                    }
+                }
+
+                if (result.length > 0) {
+                    result.push({x: result[0].x, y: result[0].y});
                 }
                 return result;
             }
@@ -1840,10 +1891,10 @@
                     if (mode === 'spiral') {
                         if (pathPts.length > 1) {
                             lines.push(`; --- Laser ${'spiral'} filling ---`);
-                            lines.push(`G0 X${pathPts[0].x.toFixed(3)} Y${pathPts[0].y.toFixed(3)}`);
+                            lines.push(`G0 X${pathPts[0].x.toFixed(4)} Y${pathPts[0].y.toFixed(4)}`);
                             lines.push(`M3 S${laserPower} ; Laser ON - start ${'spiral'} filling`);
                             for (let i = 1; i < pathPts.length; i++) {
-                                lines.push(`G1 X${pathPts[i].x.toFixed(3)} Y${pathPts[i].y.toFixed(3)} F${feed}`);
+                                lines.push(`G1 X${pathPts[i].x.toFixed(4)} Y${pathPts[i].y.toFixed(4)} F${feed}`);
                             }
                             lines.push('M5 ; Laser OFF - filling complete');
                             lines.push('');
@@ -1855,10 +1906,10 @@
 
                         if (outerPts.length > 1) {
                             lines.push(`; --- Outer contour ---`);
-                            lines.push(`G0 X${outerPts[0].x.toFixed(3)} Y${outerPts[0].y.toFixed(3)}`);
+                            lines.push(`G0 X${outerPts[0].x.toFixed(4)} Y${outerPts[0].y.toFixed(4)}`);
                             lines.push(`M3 S${laserPower} ; Laser ON - start cutting outer contour`);
                             for (let i = 1; i < outerPts.length; i++) {
-                                lines.push(`G1 X${outerPts[i].x.toFixed(3)} Y${outerPts[i].y.toFixed(3)} F${feed}`);
+                                lines.push(`G1 X${outerPts[i].x.toFixed(4)} Y${outerPts[i].y.toFixed(4)} F${feed}`);
                             }
                             lines.push('M5 ; Laser OFF - outer contour complete');
                             lines.push('');
@@ -1866,20 +1917,20 @@
 
                         if (innerPts.length > 1) {
                             lines.push(`; --- Inner contour ---`);
-                            lines.push(`G0 X${innerPts[0].x.toFixed(3)} Y${innerPts[0].y.toFixed(3)}`);
+                            lines.push(`G0 X${innerPts[0].x.toFixed(4)} Y${innerPts[0].y.toFixed(4)}`);
                             lines.push(`M3 S${laserPower} ; Laser ON - start cutting inner contour`);
                             for (let i = 1; i < innerPts.length; i++) {
-                                lines.push(`G1 X${innerPts[i].x.toFixed(3)} Y${innerPts[i].y.toFixed(3)} F${feed}`);
+                                lines.push(`G1 X${innerPts[i].x.toFixed(4)} Y${innerPts[i].y.toFixed(4)} F${feed}`);
                             }
                             lines.push('M5 ; Laser OFF - inner contour complete');
                             lines.push('');
                         }
                     } else {
                         if (pathPts.length > 1) {
-                            lines.push(`G0 X${pathPts[0].x.toFixed(3)} Y${pathPts[0].y.toFixed(3)}`);
+                            lines.push(`G0 X${pathPts[0].x.toFixed(4)} Y${pathPts[0].y.toFixed(4)}`);
                             lines.push(`M3 S${laserPower} ; Laser ON - start cutting`);
                             for (let i = 1; i < pathPts.length; i++) {
-                                lines.push(`G1 X${pathPts[i].x.toFixed(3)} Y${pathPts[i].y.toFixed(3)} F${feed}`);
+                                lines.push(`G1 X${pathPts[i].x.toFixed(4)} Y${pathPts[i].y.toFixed(4)} F${feed}`);
                             }
                             lines.push('M5 ; Laser OFF - cutting complete');
                             lines.push('');
@@ -1908,9 +1959,9 @@
                             cy = (minY + maxY) / 2;
                         }
                         lines.push('; --- Center drill ---');
-                        lines.push(`G0 X${cx.toFixed(3)} Y${cy.toFixed(3)}`);
+                        lines.push(`G0 X${cx.toFixed(4)} Y${cy.toFixed(4)}`);
                         const drillDepth = Math.min(depth * passes, -5);
-                        lines.push(`G1 Z${(drillDepth * 0.3).toFixed(3)} F${feed * 0.5} ; Center drill`);
+                        lines.push(`G1 Z${(drillDepth * 0.3).toFixed(4)} F${feed * 0.5} ; Center drill`);
                         lines.push('G0 Z5.0 ; Retract');
                         lines.push('');
                     }
@@ -1930,22 +1981,22 @@
                         if (roughPts.length > 1) {
                             for (let layer = 1; layer <= numLayers; layer++) {
                                 const zDepth = -(layerDepth * layer);
-                                lines.push(`; --- Spiral roughing layer ${layer}/${numLayers} - Z${zDepth.toFixed(3)} (stock ${stockToLeave.toFixed(2)}mm) ---`);
+                                lines.push(`; --- Spiral roughing layer ${layer}/${numLayers} - Z${zDepth.toFixed(4)} (stock ${stockToLeave.toFixed(2)}mm) ---`);
 
-                                lines.push(`G0 X${roughPts[0].x.toFixed(3)} Y${roughPts[0].y.toFixed(3)}`);
-                                lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge to layer depth`);
+                                lines.push(`G0 X${roughPts[0].x.toFixed(4)} Y${roughPts[0].y.toFixed(4)}`);
+                                lines.push(`G1 Z${zDepth.toFixed(4)} F${feed * 0.3} ; Plunge to layer depth`);
 
                                 for (let i = 1; i < roughPts.length; i++) {
-                                    lines.push(`G1 X${roughPts[i].x.toFixed(3)} Y${roughPts[i].y.toFixed(3)} F${feed}`);
+                                    lines.push(`G1 X${roughPts[i].x.toFixed(4)} Y${roughPts[i].y.toFixed(4)} F${feed}`);
                                 }
 
                                 if (finishPts.length > 1) {
                                     lines.push(`G0 Z5.0 ; Retract for finishing pass`);
-                                    lines.push(`G0 X${finishPts[0].x.toFixed(3)} Y${finishPts[0].y.toFixed(3)}`);
-                                    lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge for finish`);
+                                    lines.push(`G0 X${finishPts[0].x.toFixed(4)} Y${finishPts[0].y.toFixed(4)}`);
+                                    lines.push(`G1 Z${zDepth.toFixed(4)} F${feed * 0.3} ; Plunge for finish`);
 
                                     for (let i = 1; i < finishPts.length; i++) {
-                                        lines.push(`G1 X${finishPts[i].x.toFixed(3)} Y${finishPts[i].y.toFixed(3)} F${feed}`);
+                                        lines.push(`G1 X${finishPts[i].x.toFixed(4)} Y${finishPts[i].y.toFixed(4)} F${feed}`);
                                     }
                                     lines.push(`; Finish pass complete (exact size)`);
                                 }
@@ -1973,14 +2024,14 @@
                                     for (let i = 0; i < outerPts.length; i++) {
                                         const pt = outerPts[i];
                                         if (first) {
-                                            lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                            lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge`);
+                                            lines.push(`G0 X${pt.x.toFixed(4)} Y${pt.y.toFixed(4)}`);
+                                            lines.push(`G1 Z${zDepth.toFixed(4)} F${feed * 0.3} ; Plunge`);
                                             lastX = pt.x;
                                             lastY = pt.y;
                                             first = false;
                                             continue;
                                         }
-                                        lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
+                                        lines.push(`G1 X${pt.x.toFixed(4)} Y${pt.y.toFixed(4)} F${feed}`);
                                         lastX = pt.x;
                                         lastY = pt.y;
                                     }
@@ -2003,14 +2054,14 @@
                                     for (let i = 0; i < innerPts.length; i++) {
                                         const pt = innerPts[i];
                                         if (first) {
-                                            lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                            lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge into inner contour`);
+                                            lines.push(`G0 X${pt.x.toFixed(4)} Y${pt.y.toFixed(4)}`);
+                                            lines.push(`G1 Z${zDepth.toFixed(4)} F${feed * 0.3} ; Plunge into inner contour`);
                                             lastX = pt.x;
                                             lastY = pt.y;
                                             first = false;
                                             continue;
                                         }
-                                        lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
+                                        lines.push(`G1 X${pt.x.toFixed(4)} Y${pt.y.toFixed(4)} F${feed}`);
                                         lastX = pt.x;
                                         lastY = pt.y;
                                     }
@@ -2028,14 +2079,14 @@
                                 for (let i = 0; i < pathPts.length; i++) {
                                     const pt = pathPts[i];
                                     if (first) {
-                                        lines.push(`G0 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)}`);
-                                        lines.push(`G1 Z${zDepth.toFixed(3)} F${feed * 0.3} ; Plunge`);
+                                        lines.push(`G0 X${pt.x.toFixed(4)} Y${pt.y.toFixed(4)}`);
+                                        lines.push(`G1 Z${zDepth.toFixed(4)} F${feed * 0.3} ; Plunge`);
                                         lastX = pt.x;
                                         lastY = pt.y;
                                         first = false;
                                         continue;
                                     }
-                                    lines.push(`G1 X${pt.x.toFixed(3)} Y${pt.y.toFixed(3)} F${feed}`);
+                                    lines.push(`G1 X${pt.x.toFixed(4)} Y${pt.y.toFixed(4)} F${feed}`);
                                     lastX = pt.x;
                                     lastY = pt.y;
                                 }
