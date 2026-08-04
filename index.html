@@ -939,7 +939,7 @@
     <div class="container">
         <div class="header">
             <h1>⚙️ G-code Generator <small>CNC 3018 · GRBL</small></h1>
-            <span class="sub">Контур · Рамка · Заливка</span>
+            <span class="sub">Контур · Рамка · Выборка</span>
         </div>
 
         <div class="params-grid">
@@ -958,7 +958,7 @@
                 <div class="mode-selector">
                     <button class="mode-btn active" data-mode="outline">📐 Контур</button>
                     <button class="mode-btn" data-mode="frame">🖼️ Рамка</button>
-                    <button class="mode-btn" data-mode="spiral">🌀 Заливка (спираль)</button>
+                    <button class="mode-btn" data-mode="spiral">🌀 Выборка (спираль)</button>
                 </div>
                 <div class="hint" id="modeHint">Контур — выберите внешний (столбик) или внутренний (вырез)</div>
             </div>
@@ -2316,7 +2316,7 @@
                         const drillOn = drillCheckbox.checked && (mode === 'spiral');
                         if (drillOn) {
                             legend.innerHTML = `
-                        <span class="item"><span class="color-dot red"></span> Заливка (удаление)</span>
+                        <span class="item"><span class="color-dot red"></span> Выборка (удаление)</span>
                         <span class="item"><span class="color-dot yellow"></span> 🔧 Сверление вкл.</span>
                     `;
                         } else if (isFrame) {
@@ -2327,7 +2327,7 @@
                     `;
                         } else if (mode === 'spiral') {
                             legend.innerHTML = `
-                        <span class="item"><span class="color-dot red"></span> Заливка (материал удаляется внутри)</span>
+                        <span class="item"><span class="color-dot red"></span> Выборка (материал удаляется внутри)</span>
                     `;
                         } else {
                             if (contourSide === 'inner') {
@@ -2374,7 +2374,7 @@
                         label += contourSide === 'inner' ? '  ▶ внутренний (вырез)' : '  ▶ внешний (столбик)';
                     }
                     else if (mode === 'spiral') {
-                        label += '  ▶ заливка (спираль)';
+                        label += '  ▶ выборка (спираль)';
                         label += ` 🌀 спираль + finish (припуск ${stockToLeave}мм)`;
                         if (drillCheckbox.checked) label += ' 🔧 сверление';
                     } else if (mode === 'frame') label += '  ▶ рамка (↑ Z между контурами)';
@@ -2557,7 +2557,7 @@
                     const hints = {
                         outline: 'Контур — выберите внешний (столбик) или внутренний (вырез)',
                         frame: 'Рамка — внешний НАРУЖУ + внутренний ВНУТРЬ и РАЗВЁРНУТ, подъём Z между контурами',
-                        spiral: 'Заливка по спирали — заполняет ВСЮ площадь от центра к краю'
+                        spiral: 'Выборка по спирали — заполняет ВСЮ площадь от центра к краю'
                     };
                     modeHint.textContent = hints[currentMode] || '';
                     updateVisibility();
